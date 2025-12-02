@@ -1,0 +1,55 @@
+﻿===========================================================
+          ENTREGA - Evidencia GA7-220501096-AA2-EV01
+                Proyecto: HypnoElectronic
+                Estudiante: Miguel Castro
+                Fecha: 02/12/2025 10:44
+===========================================================
+
+ESTRUCTURA DEL PROYECTO:
+📁 src/                    - Código fuente Java (9 archivos)
+📁 lib/                    - Librerías (mysql-connector.jar)
+📄 .project, .classpath    - Configuración Eclipse
+📄 setup_mysql.sql         - Script de base de datos MySQL
+📄 README.md               - Documentación general
+
+ARCHIVOS JAVA PRINCIPALES:
+✓ DatabaseConnection.java - Conexión JDBC a MySQL
+✓ UsuarioDAO.java         - CRUD completo para usuarios
+✓ ProductoDAO.java        - CRUD completo para productos
+✓ CrudTestServlet.java    - Servlet de demostración CRUD
+✓ Usuario.java, Producto.java - Modelos/entidades
+
+OPERACIONES CRUD IMPLEMENTADAS:
+✅ CREATE (INSERT) - insertarUsuario(), insertarProducto()
+✅ READ (SELECT)   - obtenerUsuarioPorId(), obtenerTodosProductos()
+✅ UPDATE          - actualizarUsuario(), actualizarProducto()
+✅ DELETE          - eliminarUsuario(), eliminarProducto()
+
+INSTRUCCIONES DE INSTALACIÓN:
+1. Importar este proyecto en Eclipse como "Existing Projects into Workspace"
+2. Ejecutar setup_mysql.sql en MySQL Workbench
+3. Configurar Apache Tomcat 9.0+ como servidor de aplicaciones
+4. Ejecutar el proyecto (Run on Server)
+5. Probar en navegador: http://localhost:8080/HypnoElectronic/crud-test
+
+CREDENCIALES DE PRUEBA:
+- Usuario: admin
+- Contraseña: admin123
+
+ENLACE AL REPOSITORIO GIT:
+https://github.com/miguelcasrod12-web/HypnoElectronic
+
+CRITERIOS CUMPLIDOS (Evidencia GA7-220501096-AA2-EV01):
+✓ Codificación de módulos del software según requerimientos del proyecto
+✓ Conexiones con bases de datos por medio de JDBC
+✓ Implementación completa de operaciones CRUD
+✓ Estándares de codificación Java (camelCase, PascalCase, comentarios)
+✓ Uso de herramientas de versionamiento (Git/GitHub)
+✓ Documentación completa del proyecto
+
+FIRMA DEL ESTUDIANTE:
+_________________________________
+Miguel Castillo
+Análisis y desarrollo de software
+SENA - Centro de Teleinformática y Producción Industrial
+===========================================================
