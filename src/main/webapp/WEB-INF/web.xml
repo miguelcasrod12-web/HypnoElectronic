@@ -8,42 +8,7 @@
     <display-name>HypnoElectronic - SENA</display-name>
     <description>Proyecto para evidencia GA7-220501096-AA2-EV01</description>
     
-    <!-- Configuración de Servlets -->
-    <servlet>
-        <servlet-name>LoginServlet</servlet-name>
-        <servlet-class>com.hypnoelectronic.controller.LoginServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>LoginServlet</servlet-name>
-        <url-pattern>/login</url-pattern>
-    </servlet-mapping>
-    
-    <servlet>
-        <servlet-name>RegisterServlet</servlet-name>
-        <servlet-class>com.hypnoelectronic.controller.RegisterServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>RegisterServlet</servlet-name>
-        <url-pattern>/register</url-pattern>
-    </servlet-mapping>
-    
-    <servlet>
-        <servlet-name>AppointmentServlet</servlet-name>
-        <servlet-class>com.hypnoelectronic.controller.AppointmentServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>AppointmentServlet</servlet-name>
-        <url-pattern>/appointment</url-pattern>
-    </servlet-mapping>
-    
-    <servlet>
-        <servlet-name>CrudTestServlet</servlet-name>
-        <servlet-class>com.hypnoelectronic.controller.CrudTestServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>CrudTestServlet</servlet-name>
-        <url-pattern>/crud-test</url-pattern>
-    </servlet-mapping>
+    <!-- NO MÁS DEFINICIONES DE SERVLETS AQUÍ -->
     
     <!-- Página de inicio -->
     <welcome-file-list>

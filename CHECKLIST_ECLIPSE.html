@@ -1,0 +1,99 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Checklist - Configuración Eclipse & Tomcat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        .step { margin: 20px 0; padding: 15px; border-left: 4px solid #007bff; }
+        .done { border-color: #28a745; background: #f8fff9; }
+        .pending { border-color: #ffc107; background: #fffce6; }
+        .important { border-color: #dc3545; background: #fff5f5; }
+        h2 { color: #333; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>✅ Checklist: Configuración Eclipse + Tomcat</h1>
+    
+    <div class="step done">
+        <h2>✓ PASO 1: MySQL CONFIGURADO</h2>
+        <p><strong>Estado:</strong> COMPLETADO ✅</p>
+        <ul>
+            <li>Base de datos: HypnoElectronic</li>
+            <li>Tabla usuarios: 3 registros</li>
+            <li>Tabla productos: 5 registros</li>
+        </ul>
+    </div>
+    
+    <div class="step pending">
+        <h2>⏳ PASO 2: IMPORTAR PROYECTO EN ECLIPSE</h2>
+        <p><strong>Acciones:</strong></p>
+        <ol>
+            <li>Abrir Eclipse IDE</li>
+            <li>File → Import → Existing Projects into Workspace</li>
+            <li>Seleccionar carpeta: <code>C:\Users\Hogar\HypnoElectronicAuth</code></li>
+            <li>Verificar que el proyecto aparece en Package Explorer</li>
+        </ol>
+    </div>
+    
+    <div class="step pending">
+        <h2>⏳ PASO 3: CONFIGURAR TOMCAT 9.0</h2>
+        <p><strong>Acciones:</strong></p>
+        <ol>
+            <li>Vista 'Servers' → New → Server</li>
+            <li>Seleccionar: Apache → Tomcat v9.0</li>
+            <li>Especificar ruta de instalación de Tomcat</li>
+            <li>Arrastrar proyecto al servidor</li>
+        </ol>
+    </div>
+    
+    <div class="step pending">
+        <h2>⏳ PASO 4: INICIAR SERVIDOR</h2>
+        <p><strong>Acciones:</strong></p>
+        <ol>
+            <li>En vista Servers, click derecho en Tomcat</li>
+            <li>Seleccionar: Start</li>
+            <li>Esperar mensaje: <code>Server started</code></li>
+        </ol>
+    </div>
+    
+    <div class="step pending">
+        <h2>⏳ PASO 5: PROBAR APLICACIÓN</h2>
+        <p><strong>URL:</strong> <code>http://localhost:8080/HypnoElectronicAuth/</code></p>
+        <p><strong>Credenciales de prueba:</strong></p>
+        <ul>
+            <li>Usuario: <code>admin</code></li>
+            <li>Contraseña: <code>admin123</code></li>
+        </ul>
+    </div>
+    
+    <div class="step important">
+        <h2>⚠️ SOLUCIÓN DE PROBLEMAS COMUNES</h2>
+        <p><strong>Error: "Port 8080 already in use"</strong></p>
+        <ul>
+            <li>Cerrar otros programas usando puerto 8080</li>
+            <li>En Tomcat: cambiar puerto en server.xml</li>
+        </ul>
+        
+        <p><strong>Error: "The project cannot be built"</strong></p>
+        <ul>
+            <li>Click derecho en proyecto → Build Path → Configure Build Path</li>
+            <li>Verificar que mysql-connector.jar esté en Libraries</li>
+        </ul>
+        
+        <p><strong>Error: "404 - Not Found"</strong></p>
+        <ul>
+            <li>Verificar que proyecto esté desplegado en Tomcat</li>
+            <li>Context path debe ser: /HypnoElectronicAuth</li>
+        </ul>
+    </div>
+    
+    <h2>🔗 ENLACES ÚTILES</h2>
+    <ul>
+        <li>Proyecto local: <code>C:\Users\Hogar\HypnoElectronicAuth</code></li>
+        <li>URL aplicación: <code>http://localhost:8080/HypnoElectronicAuth/</code></li>
+        <li>GitHub: <code>https://github.com/miguelcasrod12-web/HypnoElectronic</code></li>
+        <li>Evidencia SENA: GA7-220501096-AA2-EV02</li>
+    </ul>
+</body>
+</html>
