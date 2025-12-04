@@ -5,6 +5,8 @@ import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -14,67 +16,91 @@ import javax.servlet.http.HttpServletResponse;
 @WebServlet("/register")
 public class RegisterServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    
-    // ConfiguraciÛn MySQL (igual que LoginServlet)
+
     private String jdbcURL = "jdbc:mysql://localhost:3306/HypnoElectronic";
     private String jdbcUsername = "root";
-    private String jdbcPassword = "Root1234";
+    private String jdbcPassword = "0000";
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        
+
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
-        
-        // Obtener par·metros del formulario
+
         String fullName = request.getParameter("fullName");
         String email = request.getParameter("email");
         String username = request.getParameter("username");
         String password = request.getParameter("password");
         String userType = request.getParameter("userType");
-        
+
         Connection conn = null;
-        PreparedStatement stmt = null;
-        
+        PreparedStatement checkStmt = null;
+        PreparedStatement insertStmt = null;
+        ResultSet rs = null;
+
         try {
-            // Cargar driver MySQL
             Class.forName("com.mysql.cj.jdbc.Driver");
-            
-            // Conectar a la base de datos
             conn = DriverManager.getConnection(jdbcURL, jdbcUsername, jdbcPassword);
+
+            // 1. VERIFICAR si el usuario ya existe
+            String checkSql = "SELECT COUNT(*) FROM usuarios WHERE username = ? OR email = ?";
+            checkStmt = conn.prepareStatement(checkSql);
+            checkStmt.setString(1, username);
+            checkStmt.setString(2, email);
+            rs = checkStmt.executeQuery();
             
-            // Insertar usuario
-            String sql = "INSERT INTO usuarios (username, password, fullName, email, userType) VALUES (?, ?, ?, ?, ?)";
-            stmt = conn.prepareStatement(sql);
-            stmt.setString(1, username);
-            stmt.setString(2, password);
-            stmt.setString(3, fullName);
-            stmt.setString(4, email);
-            stmt.setString(5, userType);
-            
-            int rows = stmt.executeUpdate();
-            
+            if (rs.next() && rs.getInt(1) > 0) {
+                // Usuario o email ya existe
+                request.setAttribute("errorMessage", "El nombre de usuario o email ya est√° registrado");
+                request.getRequestDispatcher("register.jsp").forward(request, response);
+                return;
+            }
+
+            // 2. INSERTAR nuevo usuario
+            String insertSql = "INSERT INTO usuarios (username, password, fullName, email, userType) VALUES (?, ?, ?, ?, ?)";
+            insertStmt = conn.prepareStatement(insertSql);
+            insertStmt.setString(1, username);
+            insertStmt.setString(2, password);
+            insertStmt.setString(3, fullName);
+            insertStmt.setString(4, email);
+            insertStmt.setString(5, userType);
+
+            int rows = insertStmt.executeUpdate();
+
             if (rows > 0) {
-                // Registro exitoso - redirigir con par·metro de Èxito
                 response.sendRedirect("register.jsp?success=true");
             } else {
-                out.println("<h3>Error en el registro</h3>");
-                out.println("<a href='register.jsp'>Intentar de nuevo</a>");
+                request.setAttribute("errorMessage", "Error en el registro");
+                request.getRequestDispatcher("register.jsp").forward(request, response);
             }
-            
+
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+            request.setAttribute("errorMessage", "Error del driver JDBC");
+            request.getRequestDispatcher("register.jsp").forward(request, response);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Verifica si es error de UNIQUE
+            if (e.getMessage().contains("Duplicate entry") || e.getMessage().contains("UNIQUE")) {
+                request.setAttribute("errorMessage", "El nombre de usuario o email ya est√° registrado");
+            } else {
+                request.setAttribute("errorMessage", "Error de base de datos: " + e.getMessage());
+            }
+            request.getRequestDispatcher("register.jsp").forward(request, response);
         } catch (Exception e) {
             e.printStackTrace();
-            out.println("<h3>Error de base de datos: " + e.getMessage() + "</h3>");
-            out.println("<a href='register.jsp'>Volver</a>");
+            request.setAttribute("errorMessage", "Error en el registro: " + e.getMessage());
+            request.getRequestDispatcher("register.jsp").forward(request, response);
         } finally {
-            try { if (stmt != null) stmt.close(); } catch (Exception e) {}
+            try { if (rs != null) rs.close(); } catch (Exception e) {}
+            try { if (checkStmt != null) checkStmt.close(); } catch (Exception e) {}
+            try { if (insertStmt != null) insertStmt.close(); } catch (Exception e) {}
             try { if (conn != null) conn.close(); } catch (Exception e) {}
         }
     }
-    
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        // Redirigir al formulario de registro
         response.sendRedirect("register.jsp");
     }
 }

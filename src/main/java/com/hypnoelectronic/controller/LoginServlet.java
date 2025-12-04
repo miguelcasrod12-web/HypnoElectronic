@@ -42,7 +42,7 @@ public class LoginServlet extends HttpServlet {
                 
                 // Redirigir según tipo de usuario
                 if ("admin".equals(usuario.getUserType())) {
-                    response.sendRedirect("admin/dashboard.jsp");
+                    response.sendRedirect("dashboard.jsp");
                 } else {
                     response.sendRedirect("dashboard.jsp");
                 }

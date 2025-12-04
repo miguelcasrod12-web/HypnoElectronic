@@ -41,6 +41,6 @@ Copias de seguridad automáticas
 https://github.com/miguelcasrod12-web/HypnoElectronic
 
 ## Contacto
-- **Estudiante**: Miguel Castro
+- **Estudiante**: Miguel Castillo
 - **Programa**: Análisis y desarrollo de software
 - **SENA**: Centro de Teleinformática y Producción Industrial

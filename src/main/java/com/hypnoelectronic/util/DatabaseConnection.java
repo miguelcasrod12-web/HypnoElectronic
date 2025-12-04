@@ -1,64 +1,42 @@
 package com.hypnoelectronic.util;
 
-import com.hypnoelectronic.dao.ConfiguracionDAO;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
 public class DatabaseConnection {
-    // Estos valores ahora se obtienen DINÁMICAMENTE de la BD
-    private static String URL;
-    private static String USER;
-    private static String PASSWORD;
+    
+    private static final String URL = "jdbc:mysql://localhost:3306/HypnoElectronic";
+    private static final String USER = "root";
+    private static final String PASSWORD = "0000"; // Tu contraseÃ±a
     
     static {
-        cargarConfiguracion();
-    }
-    
-    private static void cargarConfiguracion() {
-        URL = ConfiguracionDAO.getValor("db_url");
-        USER = ConfiguracionDAO.getValor("db_user");
-        PASSWORD = ConfiguracionDAO.getValor("db_password");
-        
-        System.out.println("[DatabaseConnection] Configuración cargada:");
-        System.out.println("  URL: " + URL);
-        System.out.println("  User: " + USER);
-        
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
-            System.out.println(" Driver MySQL cargado");
+            System.out.println("Driver MySQL cargado correctamente");
         } catch (ClassNotFoundException e) {
-            System.err.println(" Driver no encontrado: " + e.getMessage());
-            throw new RuntimeException("Error al cargar el driver MySQL", e);
+            System.err.println("ERROR: No se pudo cargar el driver MySQL");
+            e.printStackTrace();
+            throw new RuntimeException("Error cargando driver MySQL", e);
         }
     }
     
     public static Connection getConnection() throws SQLException {
-        if (URL == null || USER == null || PASSWORD == null) {
-            cargarConfiguracion(); // Recargar si es necesario
-        }
-        
-        try {
-            Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-            System.out.println(" Conexión establecida a: " + URL);
-            return conn;
-        } catch (SQLException e) {
-            System.err.println(" Error de conexión:");
-            System.err.println("  URL: " + URL);
-            System.err.println("  User: " + USER);
-            System.err.println("  Error: " + e.getMessage());
-            throw e;
-        }
+        System.out.println("Intentando conectar a: " + URL);
+        Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+        System.out.println("Â¡ConexiÃ³n exitosa a la base de datos!");
+        return conn;
     }
     
-    public static void actualizarConfiguracion(String url, String user, String password) {
-        ConfiguracionDAO.actualizarValor("db_url", url);
-        ConfiguracionDAO.actualizarValor("db_user", user);
-        ConfiguracionDAO.actualizarValor("db_password", password);
-        
-        // Actualizar variables estáticas
-        URL = url;
-        USER = user;
-        PASSWORD = password;
+    // MÃ©todo de prueba (opcional)
+    public static void main(String[] args) {
+        try {
+            Connection conn = getConnection();
+            System.out.println("Prueba de conexiÃ³n: OK");
+            conn.close();
+        } catch (SQLException e) {
+            System.err.println("Error de conexiÃ³n: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
