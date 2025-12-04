@@ -1,4 +1,4 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+﻿<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <!DOCTYPE html>
 <html>
 <head>
@@ -17,6 +17,18 @@
     </style>
 </head>
 <body>
+
+    <%
+        String message = request.getParameter("message");
+        if ("logout_success".equals(message)) {
+    %>
+        <div style="background: #d4edda; color: #155724; padding: 10px; margin: 10px 0; border: 1px solid #c3e6cb; border-radius: 3px;">
+            ✅ Sesión cerrada exitosamente
+        </div>
+    <%
+        }
+    %>
+
     <div class="login-container">
         <h2>Iniciar Sesión - HypnoElectronic</h2>
         
@@ -36,7 +48,9 @@
             </div>
             
             <button type="submit">Ingresar</button>
-        </form>
+        
+			<p style='text-align: center; margin-top: 20px;'>¿No tienes cuenta? <a href='register.jsp' style='color: #007bff;'>Regístrate aquí</a></p>
+</form>
     </div>
 </body>
 </html>

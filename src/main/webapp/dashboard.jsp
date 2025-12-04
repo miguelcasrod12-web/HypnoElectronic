@@ -1,4 +1,4 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+﻿<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%
     // Verificar si el usuario está logueado
     if(session.getAttribute("username") == null) {
@@ -18,14 +18,30 @@
         .logout-btn { background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
         .logout-btn:hover { background: #c82333; }
     </style>
+    <style>
+        .logout-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #dc3545;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .logout-btn:hover {
+            background: #c82333;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
         <h1 class="welcome">Bienvenido, <%= session.getAttribute("username") %>!</h1>
         <p>Sistema de Gestión HypnoElectronic</p>
-        <form action="logout" method="post">
-            <button type="submit" class="logout-btn">Cerrar Sesión</button>
-        </form>
+        <a href="logout.jsp" class="logout-btn">Cerrar Sesión</a>
     </div>
     
     <div class="content">
@@ -37,5 +53,7 @@
             <li>Configuración del Sistema</li>
         </ul>
     </div>
+<div class='enlace-navegacion'><a href='logout.jsp'>Cerrar sesión</a> | <a href='register.jsp'>Registrar usuario</a></div>
 </body>
 </html>
+

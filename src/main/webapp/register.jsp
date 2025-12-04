@@ -1,41 +1,80 @@
-<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <title>Registro - HypnoElectronic</title>
     <style>
-        body { font-family: Arial; padding: 50px; background: #f5f5f5; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        input, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
-        button { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; width: 100%; }
-        .success { color: green; margin: 10px 0; }
+        body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 5px; }
+        .alert { padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        input, select { width: 100%; padding: 8px; margin: 8px 0; }
+        button { background: #007bff; color: white; padding: 10px; border: none; width: 100%; }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Registro de Usuario</h2>
         
-        <% if (request.getParameter("success") != null) { %>
-            <div class="success">¡Registro exitoso! Ahora puedes iniciar sesión.</div>
-        <% } %>
+        <%-- SOLAMENTE AQUÃ SE DECLARA errorMessage --%>
+        <%
+            String errorMessage = (String) request.getAttribute("errorMessage");
+            String success = request.getParameter("success");
+            
+            if (errorMessage != null) {
+        %>
+            <div class="alert alert-danger">
+                <strong>Error:</strong> <%= errorMessage %>
+            </div>
+        <%
+            }
+            
+            if (success != null && success.equals("true")) {
+        %>
+            <div class="alert alert-success">
+                <strong>Â¡Ã‰xito!</strong> Usuario registrado correctamente. 
+                <a href="login.jsp">Iniciar sesiÃ³n</a>
+            </div>
+        <%
+            }
+        %>
         
         <form action="register" method="post">
-            <input type="text" name="fullName" placeholder="Nombre completo" required>
-            <input type="email" name="email" placeholder="Correo electrónico" required>
-            <input type="text" name="username" placeholder="Usuario" required>
-            <input type="password" name="password" placeholder="Contraseña" required>
+            <div>
+                <label>Nombre completo:</label>
+                <input type="text" name="fullName" required>
+            </div>
             
-            <select name="userType">
-                <option value="patient">Paciente</option>
-                <option value="doctor">Doctor</option>
-            </select>
+            <div>
+                <label>Email:</label>
+                <input type="email" name="email" required>
+            </div>
+            
+            <div>
+                <label>Nombre de usuario:</label>
+                <input type="text" name="username" required>
+            </div>
+            
+            <div>
+                <label>ContraseÃ±a:</label>
+                <input type="password" name="password" required>
+            </div>
+            
+            <div>
+                <label>Tipo de usuario:</label>
+                <select name="userType">
+                    <option value="patient">Cliente</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
             
             <button type="submit">Registrarse</button>
         </form>
         
-        <p style="margin-top: 20px; text-align: center;">
-            <a href="login.jsp">¿Ya tienes cuenta? Inicia sesión</a>
+        <p style="text-align: center; margin-top: 15px;">
+            Â¿Ya tienes cuenta? <a href="login.jsp">Inicia sesiÃ³n aquÃ­</a>
         </p>
     </div>
 </body>
