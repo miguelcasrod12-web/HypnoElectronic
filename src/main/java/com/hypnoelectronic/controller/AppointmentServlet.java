@@ -15,6 +15,10 @@ public class AppointmentServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
         
+        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
         
@@ -27,11 +31,11 @@ public class AppointmentServlet extends HttpServlet {
         out.println("th { background-color: #f2f2f2; }");
         out.println("</style>");
         out.println("</head><body>");
-        out.println("<h2>?? Gestión de Citas</h2>");
+        out.println("<h2>?? Gestiï¿½n de Citas</h2>");
         out.println("<table>");
         out.println("<tr><th>ID</th><th>Paciente</th><th>Fecha</th><th>Hora</th><th>Estado</th></tr>");
-        out.println("<tr><td>1</td><td>Juan Pérez</td><td>2024-01-15</td><td>10:00 AM</td><td>Programada</td></tr>");
-        out.println("<tr><td>2</td><td>María García</td><td>2024-01-16</td><td>02:30 PM</td><td>Completada</td></tr>");
+        out.println("<tr><td>1</td><td>Juan Pï¿½rez</td><td>2024-01-15</td><td>10:00 AM</td><td>Programada</td></tr>");
+        out.println("<tr><td>2</td><td>Marï¿½a Garcï¿½a</td><td>2024-01-16</td><td>02:30 PM</td><td>Completada</td></tr>");
         out.println("</table>");
         out.println("<br><a href='dashboard.jsp'>Volver al dashboard</a>");
         out.println("</body></html>");
