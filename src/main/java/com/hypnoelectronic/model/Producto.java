@@ -6,7 +6,8 @@ public class Producto {
     private String descripcion;
     private double precio;
     private int stock;
-    
+    private String categoria;
+
     // Constructores
     public Producto() {}
     
@@ -36,5 +37,13 @@ public class Producto {
     @Override
     public String toString() {
         return "Producto [id=" + id + ", nombre=" + nombre + ", precio=" + precio + ", stock=" + stock + "]";
+    }
+
+    public String getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(String categoria) {
+        this.categoria = categoria;
     }
 }

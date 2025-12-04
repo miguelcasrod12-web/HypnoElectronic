@@ -1,5 +1,8 @@
 package com.hypnoelectronic.api;
 
+import java.io.BufferedReader;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.Gson;
 import com.hypnoelectronic.dao.UsuarioDAO;
 import com.hypnoelectronic.dto.ApiResponse;
@@ -91,9 +94,17 @@ public class AuthAPIServlet extends HttpServlet {
      * POST /api/auth/login
      * Autentica un usuario y crea sesión
      */
-    private ApiResponse<Map<String, Object>> handleLogin(HttpServletRequest request) {
-        String username = request.getParameter("username");
-        String password = request.getParameter("password");
+
+    private ApiResponse<Map<String, Object>> handleLogin(HttpServletRequest request) throws IOException {        
+    
+        System.out.println("🚀 ENTRÓ A LOGIN");
+        
+        // Leer JSON del body
+        BufferedReader reader = request.getReader();
+        JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+
+        String username = json.has("username") ? json.get("username").getAsString() : null;
+        String password = json.has("password") ? json.get("password").getAsString() : null;
         
         if (username == null || password == null || username.trim().isEmpty() || password.trim().isEmpty()) {
             return ApiResponse.error("Username y password son requeridos", 400);
@@ -118,6 +129,8 @@ public class AuthAPIServlet extends HttpServlet {
                 userData.put("userType", usuario.getUserType());
                 userData.put("sessionId", session.getId());
                 
+                System.out.println("✅ LOGIN: username=" + username + ", password=" + password);
+
                 return ApiResponse.success("Login exitoso", userData);
             } else {
                 return ApiResponse.error("Credenciales incorrectas", 401);
@@ -132,12 +145,16 @@ public class AuthAPIServlet extends HttpServlet {
      * POST /api/auth/register
      * Registra un nuevo usuario
      */
-    private ApiResponse<Map<String, Object>> handleRegister(HttpServletRequest request) {
-        String username = request.getParameter("username");
-        String password = request.getParameter("password");
-        String fullName = request.getParameter("fullName");
-        String email = request.getParameter("email");
-        String userType = request.getParameter("userType");
+    private ApiResponse<Map<String, Object>> handleRegister(HttpServletRequest request) throws IOException {
+        // Leer el body completo
+        BufferedReader reader = request.getReader();
+        JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+
+        String username = json.has("username") ? json.get("username").getAsString() : null;
+        String password = json.has("password") ? json.get("password").getAsString() : null;
+        String fullName = json.has("fullName") ? json.get("fullName").getAsString() : null;
+        String email = json.has("email") ? json.get("email").getAsString() : null;
+        String userType = json.has("userType") ? json.get("userType").getAsString() : "patient";
         
         // Validaciones básicas
         if (username == null || username.trim().isEmpty()) {
