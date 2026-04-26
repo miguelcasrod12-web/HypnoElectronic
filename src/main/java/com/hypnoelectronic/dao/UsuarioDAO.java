@@ -1,149 +1,181 @@
-﻿package com.hypnoelectronic.dao;
+package com.hypnoelectronic.dao; // <-- Asegúrese de que diga DAO
 
 import com.hypnoelectronic.model.Usuario;
 import com.hypnoelectronic.util.DatabaseConnection;
-import java.sql.*;
+import java.sql.Connection;          // Import fundamental
+import org.mindrot.jbcrypt.BCrypt;   // Import para BCrypt
+import java.sql.PreparedStatement;   // Import fundamental
+import java.sql.ResultSet;           // Import fundamental
+import java.sql.SQLException;        // Import fundamental
+import java.sql.Statement;           // Import fundamental
 import java.util.ArrayList;
 import java.util.List;
 
 public class UsuarioDAO {
-    
-    // CREATE - Insertar usuario
-    public boolean insertarUsuario(Usuario usuario) {
-        String sql = "INSERT INTO usuarios (username, password, fullName, email, userType) VALUES (?, ?, ?, ?, ?)";
+
+    /**
+     * LOGIN PRINCIPAL: Valida credenciales y trae el nombre del rol (admin/cliente)
+     */
+    public Usuario login(String username, String password) { // Añadido BCrypt
+        Usuario user = null;
+        // Cambiado a LEFT JOIN para evitar que falle si la tabla roles está incompleta
+        String sql = "SELECT u.*, r.nombre_role " +
+                     "FROM usuarios u " +
+                     "LEFT JOIN roles r ON u.role_id = r.idrole " +
+                     "WHERE u.username = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
             
-            pstmt.setString(1, usuario.getUsername());
-            pstmt.setString(2, usuario.getPassword());
-            pstmt.setString(3, usuario.getFullName());
-            pstmt.setString(4, usuario.getEmail());
-            pstmt.setString(5, usuario.getUserType());
-            
-            int rowsAffected = pstmt.executeUpdate();
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-    
-    // READ - Obtener usuario por ID
-    public Usuario obtenerUsuarioPorId(int id) {
-        String sql = "SELECT * FROM usuarios WHERE id = ?";
-        Usuario usuario = null;
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            pstmt.setInt(1, id);
-            ResultSet rs = pstmt.executeQuery();
-            
+            ps.setString(1, username);
+            ResultSet rs = ps.executeQuery();
+
             if (rs.next()) {
-                usuario = extraerUsuarioDeResultSet(rs);
+                System.out.println("🔍 Debug Login: Usuario encontrado -> " + username);
+                // Verificamos la contraseña con BCrypt (antes no estaba)
+                String hashedPassword = rs.getString("password"); // Obtener el hash de la DB
+                // Comparar el password ingresado con el hash almacenado
+                if (BCrypt.checkpw(password, hashedPassword)) {
+                    user = extraerUsuarioDeResultSet(rs);
+                    System.out.println("✅ Debug Login: Password coincide.");
+                } else {
+                    System.out.println("❌ Debug Login: Password NO coincide.");
+                }
+            } else {
+                System.out.println("❌ Debug Login: Username no encontrado en DB.");
             }
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Error en login: " + e.getMessage());
         }
-        
-        return usuario;
+        return user;
     }
-    
-    // READ - Obtener todos los usuarios
-    public List<Usuario> obtenerTodosUsuarios() {
-        List<Usuario> usuarios = new ArrayList<>();
-        String sql = "SELECT * FROM usuarios";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            
-            while (rs.next()) {
-                usuarios.add(extraerUsuarioDeResultSet(rs));
-            }
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        
-        return usuarios;
-    }
-    
-    // UPDATE - Actualizar usuario
-    public boolean actualizarUsuario(Usuario usuario) {
-        String sql = "UPDATE usuarios SET username = ?, password = ?, fullName = ?, email = ?, userType = ? WHERE id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            pstmt.setString(1, usuario.getUsername());
-            pstmt.setString(2, usuario.getPassword());
-            pstmt.setString(3, usuario.getFullName());
-            pstmt.setString(4, usuario.getEmail());
-            pstmt.setString(5, usuario.getUserType());
-            pstmt.setInt(6, usuario.getId());
-            
-            int rowsAffected = pstmt.executeUpdate();
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-    
-    // DELETE - Eliminar usuario
-    public boolean eliminarUsuario(int id) {
-        String sql = "DELETE FROM usuarios WHERE id = ?";
-        
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
-            pstmt.setInt(1, id);
-            int rowsAffected = pstmt.executeUpdate();
-            return rowsAffected > 0;
-            
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-    
-    // Método auxiliar para extraer datos del ResultSet
-    private Usuario extraerUsuarioDeResultSet(ResultSet rs) throws SQLException {
-        Usuario usuario = new Usuario();
-        usuario.setId(rs.getInt("id"));
-        usuario.setUsername(rs.getString("username"));
-        usuario.setPassword(rs.getString("password"));
-        usuario.setFullName(rs.getString("fullName"));
-        usuario.setEmail(rs.getString("email"));
-        usuario.setUserType(rs.getString("userType"));
-        usuario.setCreatedAt(rs.getTimestamp("created_at"));
-        return usuario;
-    }
-    
-    // Método para validar login (ya lo tienes en LoginServlet)
+
+    // Método de compatibilidad para AuthAPIServlet
     public Usuario validarLogin(String username, String password) {
-        String sql = "SELECT * FROM usuarios WHERE username = ? AND password = ?";
+        return login(username, password);
+    }
+
+    /**
+     * REGISTRO: Inserta con el role_id correspondiente
+     */
+    public boolean registrar(Usuario usuario) { // Añadido BCrypt
+        // 1 para admin, 2 para cliente
+        int roleId = (usuario.getUserType() != null && usuario.getUserType().equalsIgnoreCase("admin")) ? 1 : 2;
+        String hashedPassword = BCrypt.hashpw(usuario.getPassword(), BCrypt.gensalt()); // Hash de la contraseña
+        
+        String sql = "INSERT INTO usuarios (nombre_completo, email, username, password, role_id) VALUES (?, ?, ?, ?, ?)"; 
         
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            pstmt.setString(1, username);
-            pstmt.setString(2, password);
-            ResultSet rs = pstmt.executeQuery();
+            pstmt.setString(1, usuario.getFullName());
+            pstmt.setString(2, usuario.getEmail());
+            pstmt.setString(3, usuario.getUsername());
+            pstmt.setString(4, hashedPassword); // Guardamos la contraseña hasheada
+            pstmt.setInt(5, roleId);
             
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error en registro: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // Método de compatibilidad para APIs
+    public boolean insertarUsuario(Usuario usuario) {
+        return registrar(usuario);
+    }
+
+    public Usuario obtenerUsuarioPorId(int id) {
+        String sql = "SELECT u.*, r.nombre_role FROM usuarios u " +
+                     "LEFT JOIN roles r ON u.role_id = r.idrole " +
+                     "WHERE u.id_usuario = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
                 return extraerUsuarioDeResultSet(rs);
             }
-            
         } catch (SQLException e) {
             e.printStackTrace();
         }
-        
         return null;
+    }
+
+    public List<Usuario> obtenerTodosUsuarios() {
+        List<Usuario> lista = new ArrayList<>();
+        String sql = "SELECT u.*, r.nombre_role FROM usuarios u " +
+                     "LEFT JOIN roles r ON u.role_id = r.idrole";
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                lista.add(extraerUsuarioDeResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return lista;
+    }
+
+    // Método para compatibilidad con versiones anteriores
+    public List<Usuario> listarUsuarios() { return obtenerTodosUsuarios(); }
+
+    public boolean actualizarUsuario(Usuario usuario) {
+        int roleId = (usuario.getUserType() != null && usuario.getUserType().equalsIgnoreCase("admin")) ? 1 : 2;
+        String sql;
+        String hashedPassword = null;
+        if (usuario.getPassword() != null && !usuario.getPassword().isEmpty()) {
+            hashedPassword = BCrypt.hashpw(usuario.getPassword(), BCrypt.gensalt()); // Hash de la nueva contraseña
+            sql = "UPDATE usuarios SET nombre_completo = ?, email = ?, username = ?, password = ?, role_id = ? WHERE id_usuario = ?";
+        } else {
+            sql = "UPDATE usuarios SET nombre_completo = ?, email = ?, username = ?, role_id = ? WHERE id_usuario = ?";
+        }
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            int i = 1;
+            pstmt.setString(i++, usuario.getFullName());
+            pstmt.setString(i++, usuario.getEmail());
+            pstmt.setString(i++, usuario.getUsername());
+            if (hashedPassword != null) {
+                pstmt.setString(i++, hashedPassword);
+            }
+            pstmt.setInt(i++, roleId);
+            pstmt.setInt(i++, usuario.getId());
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error al actualizar usuario: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean eliminarUsuario(int id) {
+        String sql = "DELETE FROM usuarios WHERE id_usuario = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, id);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error al eliminar usuario: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Mapea el ResultSet a un objeto Usuario
+     */
+    private Usuario extraerUsuarioDeResultSet(ResultSet rs) throws SQLException {
+        Usuario usuario = new Usuario();
+        usuario.setId(rs.getInt("id_usuario"));
+        usuario.setUsername(rs.getString("username"));
+        usuario.setPassword(rs.getString("password"));
+        usuario.setFullName(rs.getString("nombre_completo"));
+        usuario.setEmail(rs.getString("email"));
+        // Verificación segura de la existencia de la columna de rol
+        String role = rs.getString("nombre_role");
+        usuario.setUserType(role != null ? role : "cliente");
+        return usuario;
     }
 }

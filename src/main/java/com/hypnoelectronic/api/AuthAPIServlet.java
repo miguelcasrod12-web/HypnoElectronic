@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import com.hypnoelectronic.dao.UsuarioDAO;
 import com.hypnoelectronic.dto.ApiResponse;
 import com.hypnoelectronic.model.Usuario;
+import org.mindrot.jbcrypt.BCrypt; // Importar BCrypt
 import com.hypnoelectronic.util.DatabaseConnection;
 
 import javax.servlet.ServletException;
@@ -28,7 +29,7 @@ import java.util.Map;
  * Endpoint: /api/auth/*
  * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
  */
-@WebServlet("/api/auth/*")
+/*@WebServlet("/api/auth/*")*/ // Comentado para usar web.xml
 public class AuthAPIServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private Gson gson = new Gson();
@@ -116,7 +117,7 @@ public class AuthAPIServlet extends HttpServlet {
             if (usuario != null) {
                 // Crear sesión
                 HttpSession session = request.getSession(true);
-                session.setAttribute("usuario", usuario);
+                session.setAttribute("user", usuario); // Estandarizado a "user"
                 session.setAttribute("userId", usuario.getId());
                 session.setAttribute("userType", usuario.getUserType());
                 
@@ -129,10 +130,8 @@ public class AuthAPIServlet extends HttpServlet {
                 userData.put("userType", usuario.getUserType());
                 userData.put("sessionId", session.getId());
                 
-                System.out.println("✅ LOGIN: username=" + username + ", password=" + password);
-
                 return ApiResponse.success("Login exitoso", userData);
-            } else {
+            } else { // Si el usuario es null, las credenciales son incorrectas
                 return ApiResponse.error("Credenciales incorrectas", 401);
             }
         } catch (Exception e) {
@@ -154,7 +153,7 @@ public class AuthAPIServlet extends HttpServlet {
         String password = json.has("password") ? json.get("password").getAsString() : null;
         String fullName = json.has("fullName") ? json.get("fullName").getAsString() : null;
         String email = json.has("email") ? json.get("email").getAsString() : null;
-        String userType = json.has("userType") ? json.get("userType").getAsString() : "patient";
+        String userType = json.has("userType") ? json.get("userType").getAsString() : "cliente";
         
         // Validaciones básicas
         if (username == null || username.trim().isEmpty()) {
@@ -186,10 +185,10 @@ public class AuthAPIServlet extends HttpServlet {
         try {
             Usuario nuevoUsuario = new Usuario();
             nuevoUsuario.setUsername(username);
-            nuevoUsuario.setPassword(password);
+            nuevoUsuario.setPassword(password); // Se hashea en el DAO, no aquí
             nuevoUsuario.setFullName(fullName != null ? fullName : "");
             nuevoUsuario.setEmail(email);
-            nuevoUsuario.setUserType(userType != null ? userType : "patient");
+            nuevoUsuario.setUserType(userType != null ? userType : "cliente");
             
             boolean creado = usuarioDAO.insertarUsuario(nuevoUsuario);
             
@@ -228,8 +227,8 @@ public class AuthAPIServlet extends HttpServlet {
     private ApiResponse<Map<String, Object>> handleCheckAuth(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         
-        if (session != null && session.getAttribute("usuario") != null) {
-            Usuario usuario = (Usuario) session.getAttribute("usuario");
+        if (session != null && session.getAttribute("user") != null) {
+            Usuario usuario = (Usuario) session.getAttribute("user");
             
             Map<String, Object> userData = new HashMap<>();
             userData.put("authenticated", true);

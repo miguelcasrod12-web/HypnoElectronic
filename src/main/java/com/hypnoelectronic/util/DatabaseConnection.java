@@ -1,42 +1,43 @@
 package com.hypnoelectronic.util;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Properties;
+import java.io.InputStream;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 public class DatabaseConnection {
     
-    private static final String URL = "jdbc:mysql://localhost:3306/HypnoElectronic";
-    private static final String USER = "root";
-    private static final String PASSWORD = "0000"; // Tu contraseña
+    private static HikariDataSource dataSource;
     
     static {
         try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            System.out.println("Driver MySQL cargado correctamente");
-        } catch (ClassNotFoundException e) {
-            System.err.println("ERROR: No se pudo cargar el driver MySQL");
+            Properties props = new Properties();
+            try (InputStream is = DatabaseConnection.class.getClassLoader().getResourceAsStream("db.properties")) {
+                if (is == null) throw new RuntimeException("No se encontró db.properties");
+                props.load(is);
+            }
+
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(props.getProperty("db.url"));
+            config.setUsername(props.getProperty("db.user"));
+            config.setPassword(props.getProperty("db.password"));
+            config.setDriverClassName(props.getProperty("db.driver"));
+            
+            // Configuraciones profesionales adicionales
+            config.setMaximumPoolSize(10);
+            config.addDataSourceProperty("cachePrepStmts", "true");
+            config.addDataSourceProperty("prepStmtCacheSize", "250");
+
+            dataSource = new HikariDataSource(config);
+            System.out.println("Pool de conexiones HikariCP inicializado");
+        } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Error cargando driver MySQL", e);
         }
     }
     
     public static Connection getConnection() throws SQLException {
-        System.out.println("Intentando conectar a: " + URL);
-        Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
-        System.out.println("¡Conexión exitosa a la base de datos!");
-        return conn;
-    }
-    
-    // Método de prueba (opcional)
-    public static void main(String[] args) {
-        try {
-            Connection conn = getConnection();
-            System.out.println("Prueba de conexión: OK");
-            conn.close();
-        } catch (SQLException e) {
-            System.err.println("Error de conexión: " + e.getMessage());
-            e.printStackTrace();
-        }
+        return dataSource.getConnection();
     }
 }

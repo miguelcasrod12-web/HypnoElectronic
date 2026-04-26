@@ -23,7 +23,7 @@ import java.util.HashMap;
  * Endpoint: /api/products/*
  * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
  */
-@WebServlet("/api/products/*")
+/*@WebServlet("/api/products/*")*/
 public class ProductosAPIServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private Gson gson = new Gson();
@@ -194,8 +194,10 @@ public class ProductosAPIServlet extends HttpServlet {
             if (productoActualizado.getStock() == 0) {
                 productoActualizado.setStock(productoExistente.getStock());
             }
-            if (productoActualizado.getCategoria() == null) {
-                productoActualizado.setCategoria(productoExistente.getCategoria());
+            // Asegurarse de que los IDs de categoría y proveedor se mantengan si no se actualizan
+            if (productoActualizado.getCategoriaId() == 0) {
+                productoActualizado.setCategoriaId(productoExistente.getCategoriaId());
+                productoActualizado.setProveedorId(productoExistente.getProveedorId());
             }
             
             boolean actualizado = productoDAO.actualizarProducto(productoActualizado);
@@ -262,7 +264,8 @@ public class ProductosAPIServlet extends HttpServlet {
                 if (jsonObject.has("descripcion")) producto.setDescripcion(jsonObject.get("descripcion").getAsString());
                 if (jsonObject.has("precio")) producto.setPrecio(jsonObject.get("precio").getAsDouble());
                 if (jsonObject.has("stock")) producto.setStock(jsonObject.get("stock").getAsInt());
-                if (jsonObject.has("categoria")) producto.setCategoria(jsonObject.get("categoria").getAsString());
+                if (jsonObject.has("categoriaId")) producto.setCategoriaId(jsonObject.get("categoriaId").getAsInt());
+                if (jsonObject.has("proveedorId")) producto.setProveedorId(jsonObject.get("proveedorId").getAsInt());
                 
                 return producto;
             }
@@ -282,7 +285,11 @@ public class ProductosAPIServlet extends HttpServlet {
             producto.setStock(Integer.parseInt(stockStr));
         }
         
-        producto.setCategoria(request.getParameter("categoria"));
+        String catId = request.getParameter("categoriaId");
+        if (catId != null) producto.setCategoriaId(Integer.parseInt(catId));
+        
+        String provId = request.getParameter("proveedorId");
+        if (provId != null) producto.setProveedorId(Integer.parseInt(provId));
         
         return producto;
     }

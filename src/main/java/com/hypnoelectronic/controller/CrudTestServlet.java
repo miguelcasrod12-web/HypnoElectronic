@@ -1,4 +1,4 @@
-﻿package com.hypnoelectronic.controller;
+package com.hypnoelectronic.controller;
 
 import com.hypnoelectronic.dao.ProductoDAO;
 import com.hypnoelectronic.dao.UsuarioDAO;

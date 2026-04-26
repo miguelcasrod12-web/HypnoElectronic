@@ -1,0 +1,2375 @@
+﻿--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\api\AuthAPIServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.api;
+
+import java.io.BufferedReader;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.Gson;
+import com.hypnoelectronic.dao.UsuarioDAO;
+import com.hypnoelectronic.dto.ApiResponse;
+import com.hypnoelectronic.model.Usuario;
+import com.hypnoelectronic.util.DatabaseConnection;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * API REST para autenticaciÃ³n de usuarios
+ * Endpoint: /api/auth/*
+ * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
+ */
+/*@WebServlet("/api/auth/*")*/
+public class AuthAPIServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    private Gson gson = new Gson();
+    private UsuarioDAO usuarioDAO = new UsuarioDAO();
+
+    /**
+     * Maneja todas las solicitudes GET, POST, PUT, DELETE
+     */
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        // Configurar respuesta como JSON
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        
+        // Configurar CORS (para permitir frontend React)
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        
+        String pathInfo = request.getPathInfo();
+        String method = request.getMethod();
+        
+        PrintWriter out = response.getWriter();
+        ApiResponse<?> apiResponse;
+        
+        try {
+            // Enrutamiento basado en path y mÃ©todo
+            if ("/login".equals(pathInfo) && "POST".equals(method)) {
+                apiResponse = handleLogin(request);
+            } else if ("/register".equals(pathInfo) && "POST".equals(method)) {
+                apiResponse = handleRegister(request);
+            } else if ("/logout".equals(pathInfo) && "POST".equals(method)) {
+                apiResponse = handleLogout(request);
+            } else if ("/check".equals(pathInfo) && "GET".equals(method)) {
+                apiResponse = handleCheckAuth(request);
+            } else if ("OPTIONS".equals(method)) {
+                // Manejar preflight CORS
+                response.setStatus(HttpServletResponse.SC_OK);
+                return;
+            } else {
+                apiResponse = ApiResponse.error("Endpoint no encontrado: " + pathInfo, 404);
+            }
+            
+            // Establecer cÃ³digo de estado HTTP
+            response.setStatus(apiResponse.getStatusCode());
+            
+            // Convertir respuesta a JSON y enviar
+            String jsonResponse = gson.toJson(apiResponse);
+            out.print(jsonResponse);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            apiResponse = ApiResponse.error("Error interno del servidor: " + e.getMessage(), 500);
+            response.setStatus(500);
+            out.print(gson.toJson(apiResponse));
+        } finally {
+            out.flush();
+        }
+    }
+
+    /**
+     * POST /api/auth/login
+     * Autentica un usuario y crea sesiÃ³n
+     */
+
+    private ApiResponse<Map<String, Object>> handleLogin(HttpServletRequest request) throws IOException {        
+    
+        System.out.println("ðŸš€ ENTRÃ“ A LOGIN");
+        
+        // Leer JSON del body
+        BufferedReader reader = request.getReader();
+        JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+
+        String username = json.has("username") ? json.get("username").getAsString() : null;
+        String password = json.has("password") ? json.get("password").getAsString() : null;
+        
+        if (username == null || password == null || username.trim().isEmpty() || password.trim().isEmpty()) {
+            return ApiResponse.error("Username y password son requeridos", 400);
+        }
+        
+        try {
+            Usuario usuario = usuarioDAO.validarLogin(username, password);
+            
+            if (usuario != null) {
+                // Crear sesiÃ³n
+                HttpSession session = request.getSession(true);
+                session.setAttribute("usuario", usuario);
+                session.setAttribute("userId", usuario.getId());
+                session.setAttribute("userType", usuario.getUserType());
+                
+                // Preparar datos de respuesta
+                Map<String, Object> userData = new HashMap<>();
+                userData.put("id", usuario.getId());
+                userData.put("username", usuario.getUsername());
+                userData.put("fullName", usuario.getFullName());
+                userData.put("email", usuario.getEmail());
+                userData.put("userType", usuario.getUserType());
+                userData.put("sessionId", session.getId());
+                
+                System.out.println("âœ… LOGIN: username=" + username + ", password=" + password);
+
+                return ApiResponse.success("Login exitoso", userData);
+            } else {
+                return ApiResponse.error("Credenciales incorrectas", 401);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error en autenticaciÃ³n: " + e.getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/auth/register
+     * Registra un nuevo usuario
+     */
+    private ApiResponse<Map<String, Object>> handleRegister(HttpServletRequest request) throws IOException {
+        // Leer el body completo
+        BufferedReader reader = request.getReader();
+        JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+
+        String username = json.has("username") ? json.get("username").getAsString() : null;
+        String password = json.has("password") ? json.get("password").getAsString() : null;
+        String fullName = json.has("fullName") ? json.get("fullName").getAsString() : null;
+        String email = json.has("email") ? json.get("email").getAsString() : null;
+        String userType = json.has("userType") ? json.get("userType").getAsString() : "patient";
+        
+        // Validaciones bÃ¡sicas
+        if (username == null || username.trim().isEmpty()) {
+            return ApiResponse.error("Username es requerido", 400);
+        }
+        if (password == null || password.trim().isEmpty()) {
+            return ApiResponse.error("Password es requerido", 400);
+        }
+        if (email == null || email.trim().isEmpty()) {
+            return ApiResponse.error("Email es requerido", 400);
+        }
+        
+        // Verificar si usuario ya existe
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String checkSql = "SELECT COUNT(*) FROM usuarios WHERE username = ? OR email = ?";
+            PreparedStatement pstmt = conn.prepareStatement(checkSql);
+            pstmt.setString(1, username);
+            pstmt.setString(2, email);
+            ResultSet rs = pstmt.executeQuery();
+            
+            if (rs.next() && rs.getInt(1) > 0) {
+                return ApiResponse.error("El username o email ya estÃ¡n registrados", 409);
+            }
+        } catch (Exception e) {
+            return ApiResponse.error("Error verificando usuario: " + e.getMessage(), 500);
+        }
+        
+        // Crear nuevo usuario
+        try {
+            Usuario nuevoUsuario = new Usuario();
+            nuevoUsuario.setUsername(username);
+            nuevoUsuario.setPassword(password);
+            nuevoUsuario.setFullName(fullName != null ? fullName : "");
+            nuevoUsuario.setEmail(email);
+            nuevoUsuario.setUserType(userType != null ? userType : "patient");
+            
+            boolean creado = usuarioDAO.insertarUsuario(nuevoUsuario);
+            
+            if (creado) {
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("username", username);
+                responseData.put("email", email);
+                responseData.put("message", "Usuario registrado exitosamente");
+                
+                return ApiResponse.success(responseData);
+            } else {
+                return ApiResponse.error("No se pudo registrar el usuario", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error en registro: " + e.getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/auth/logout
+     * Cierra la sesiÃ³n del usuario
+     */
+    private ApiResponse<String> handleLogout(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return ApiResponse.success("SesiÃ³n cerrada exitosamente", null);
+    }
+
+    /**
+     * GET /api/auth/check
+     * Verifica si hay una sesiÃ³n activa
+     */
+    private ApiResponse<Map<String, Object>> handleCheckAuth(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        
+        if (session != null && session.getAttribute("usuario") != null) {
+            Usuario usuario = (Usuario) session.getAttribute("usuario");
+            
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("authenticated", true);
+            userData.put("id", usuario.getId());
+            userData.put("username", usuario.getUsername());
+            userData.put("fullName", usuario.getFullName());
+            userData.put("userType", usuario.getUserType());
+            userData.put("sessionId", session.getId());
+            
+            return ApiResponse.success(userData);
+        } else {
+            Map<String, Object> data = new HashMap<>();
+            data.put("authenticated", false);
+            return ApiResponse.success(data);
+        }
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\api\CORSFilter.java
+--------------------------------------------------
+package com.hypnoelectronic.api;
+
+import java.io.IOException;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.annotation.WebFilter;
+import javax.servlet.http.HttpServletResponse;
+
+@WebFilter("/*")
+public class CORSFilter implements Filter {
+    
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) 
+            throws IOException, ServletException {
+        HttpServletResponse response = (HttpServletResponse) res;
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
+        response.setHeader("Access-Control-Max-Age", "3600");
+        chain.doFilter(req, res);
+    }
+    
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {}
+    
+    @Override
+    public void destroy() {}
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\api\ProductosAPIServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.api;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.hypnoelectronic.dao.ProductoDAO;
+import com.hypnoelectronic.dto.ApiResponse;
+import com.hypnoelectronic.model.Producto;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+/**
+ * API REST para gestiÃ³n de productos
+ * Endpoint: /api/products/*
+ * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
+ */
+/*@WebServlet("/api/products/*")*/
+public class ProductosAPIServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    private Gson gson = new Gson();
+    private ProductoDAO productoDAO = new ProductoDAO();
+
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        // Configurar respuesta JSON y CORS
+        configureResponse(response);
+        
+        String pathInfo = request.getPathInfo();
+        String method = request.getMethod();
+        
+        PrintWriter out = response.getWriter();
+        ApiResponse<?> apiResponse;
+        
+        try {
+            // Enrutamiento
+            if (pathInfo == null || "/".equals(pathInfo)) {
+                // /api/products
+                if ("GET".equals(method)) {
+                    apiResponse = getAllProducts();
+                } else if ("POST".equals(method)) {
+                    apiResponse = createProduct(request);
+                } else {
+                    apiResponse = ApiResponse.error("MÃ©todo no permitido", 405);
+                }
+            } else {
+                // /api/products/{id}
+                String[] pathParts = pathInfo.split("/");
+                if (pathParts.length == 2) {
+                    try {
+                        int productId = Integer.parseInt(pathParts[1]);
+                        
+                        if ("GET".equals(method)) {
+                            apiResponse = getProductById(productId);
+                        } else if ("PUT".equals(method)) {
+                            apiResponse = updateProduct(productId, request);
+                        } else if ("DELETE".equals(method)) {
+                            apiResponse = deleteProduct(productId);
+                        } else {
+                            apiResponse = ApiResponse.error("MÃ©todo no permitido", 405);
+                        }
+                    } catch (NumberFormatException e) {
+                        apiResponse = ApiResponse.error("ID de producto invÃ¡lido", 400);
+                    }
+                } else {
+                    apiResponse = ApiResponse.error("Endpoint no encontrado", 404);
+                }
+            }
+            
+            response.setStatus(apiResponse.getStatusCode());
+            out.print(gson.toJson(apiResponse));
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            apiResponse = ApiResponse.error("Error interno: " + e.getMessage(), 500);
+            response.setStatus(500);
+            out.print(gson.toJson(apiResponse));
+        } finally {
+            out.flush();
+        }
+    }
+    
+    private void configureResponse(HttpServletResponse response) {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    
+    /**
+     * GET /api/products
+     * Obtiene todos los productos
+     */
+    private ApiResponse<List<Producto>> getAllProducts() {
+        try {
+            List<Producto> productos = productoDAO.obtenerTodosProductos();
+            if (productos.isEmpty()) {
+                return ApiResponse.success("No hay productos registrados", productos);
+            }
+            return ApiResponse.success(productos);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error obteniendo productos: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * GET /api/products/{id}
+     * Obtiene un producto por ID
+     */
+    private ApiResponse<Producto> getProductById(int id) {
+        try {
+            Producto producto = productoDAO.obtenerProductoPorId(id);
+            if (producto != null) {
+                return ApiResponse.success(producto);
+            } else {
+                return ApiResponse.notFound("Producto con ID " + id);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error obteniendo producto: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * POST /api/products
+     * Crea un nuevo producto
+     */
+    private ApiResponse<Producto> createProduct(HttpServletRequest request) {
+        try {
+            // Leer cuerpo JSON si existe, si no usar parÃ¡metros
+            Producto producto = parseProductFromRequest(request);
+            
+            if (producto.getNombre() == null || producto.getNombre().trim().isEmpty()) {
+                return ApiResponse.error("El nombre del producto es requerido", 400);
+            }
+            if (producto.getPrecio() <= 0) {
+                return ApiResponse.error("El precio debe ser mayor a 0", 400);
+            }
+            
+            boolean creado = productoDAO.insertarProducto(producto);
+            if (creado) {
+                // Obtener el ID generado (asumiendo que el Ãºltimo insertado es el nuevo)
+                List<Producto> productos = productoDAO.obtenerTodosProductos();
+                Producto nuevoProducto = productos.get(productos.size() - 1);
+                return ApiResponse.success("Producto creado exitosamente", nuevoProducto);
+            } else {
+                return ApiResponse.error("No se pudo crear el producto", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error creando producto: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * PUT /api/products/{id}
+     * Actualiza un producto existente
+     */
+    private ApiResponse<Producto> updateProduct(int id, HttpServletRequest request) {
+        try {
+            // Verificar que el producto existe
+            Producto productoExistente = productoDAO.obtenerProductoPorId(id);
+            if (productoExistente == null) {
+                return ApiResponse.notFound("Producto con ID " + id);
+            }
+            
+            // Obtener datos actualizados
+            Producto productoActualizado = parseProductFromRequest(request);
+            
+            // Mantener ID original
+            productoActualizado.setId(id);
+            
+            // Si no se enviaron algunos campos, mantener los existentes
+            if (productoActualizado.getNombre() == null) {
+                productoActualizado.setNombre(productoExistente.getNombre());
+            }
+            if (productoActualizado.getDescripcion() == null) {
+                productoActualizado.setDescripcion(productoExistente.getDescripcion());
+            }
+            if (productoActualizado.getPrecio() == 0) {
+                productoActualizado.setPrecio(productoExistente.getPrecio());
+            }
+            if (productoActualizado.getStock() == 0) {
+                productoActualizado.setStock(productoExistente.getStock());
+            }
+            if (productoActualizado.getCategoria() == null) {
+                productoActualizado.setCategoria(productoExistente.getCategoria());
+            }
+            
+            boolean actualizado = productoDAO.actualizarProducto(productoActualizado);
+            if (actualizado) {
+                Producto productoFinal = productoDAO.obtenerProductoPorId(id);
+                return ApiResponse.success("Producto actualizado exitosamente", productoFinal);
+            } else {
+                return ApiResponse.error("No se pudo actualizar el producto", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error actualizando producto: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * DELETE /api/products/{id}
+     * Elimina un producto
+     */
+    private ApiResponse<Map<String, Object>> deleteProduct(int id) {
+        try {
+            // Verificar que existe
+            Producto producto = productoDAO.obtenerProductoPorId(id);
+            if (producto == null) {
+                return ApiResponse.notFound("Producto con ID " + id);
+            }
+            
+            boolean eliminado = productoDAO.eliminarProducto(id);
+            if (eliminado) {
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("id", id);
+                responseData.put("message", "Producto eliminado exitosamente");
+                responseData.put("productoEliminado", producto.getNombre());
+                
+                return ApiResponse.success(responseData);
+            } else {
+                return ApiResponse.error("No se pudo eliminar el producto", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error eliminando producto: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Parsea un producto desde la solicitud (JSON o form-data)
+     */
+    private Producto parseProductFromRequest(HttpServletRequest request) throws IOException {
+        Producto producto = new Producto();
+        
+        // Intentar leer como JSON primero
+        if ("application/json".equals(request.getContentType())) {
+            BufferedReader reader = request.getReader();
+            StringBuilder jsonBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                jsonBuilder.append(line);
+            }
+            
+            if (jsonBuilder.length() > 0) {
+                JsonObject jsonObject = gson.fromJson(jsonBuilder.toString(), JsonObject.class);
+                
+                if (jsonObject.has("nombre")) producto.setNombre(jsonObject.get("nombre").getAsString());
+                if (jsonObject.has("descripcion")) producto.setDescripcion(jsonObject.get("descripcion").getAsString());
+                if (jsonObject.has("precio")) producto.setPrecio(jsonObject.get("precio").getAsDouble());
+                if (jsonObject.has("stock")) producto.setStock(jsonObject.get("stock").getAsInt());
+                if (jsonObject.has("categoria")) producto.setCategoria(jsonObject.get("categoria").getAsString());
+                
+                return producto;
+            }
+        }
+        
+        // Si no es JSON, usar parÃ¡metros normales
+        producto.setNombre(request.getParameter("nombre"));
+        producto.setDescripcion(request.getParameter("descripcion"));
+        
+        String precioStr = request.getParameter("precio");
+        if (precioStr != null && !precioStr.trim().isEmpty()) {
+            producto.setPrecio(Double.parseDouble(precioStr));
+        }
+        
+        String stockStr = request.getParameter("stock");
+        if (stockStr != null && !stockStr.trim().isEmpty()) {
+            producto.setStock(Integer.parseInt(stockStr));
+        }
+        
+        producto.setCategoria(request.getParameter("categoria"));
+        
+        return producto;
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\api\UsuariosAPIServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.api;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.hypnoelectronic.dao.UsuarioDAO;
+import com.hypnoelectronic.dto.ApiResponse;
+import com.hypnoelectronic.model.Usuario;
+import com.hypnoelectronic.util.DatabaseConnection;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * API REST para gestiÃ³n de usuarios (solo administradores)
+ * Endpoint: /api/users/*
+ * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
+ */
+@WebServlet("/api/users/*")
+public class UsuariosAPIServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    private Gson gson = new Gson();
+    private UsuarioDAO usuarioDAO = new UsuarioDAO();
+
+    protected void service(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        // Configurar respuesta
+        configureResponse(response);
+        
+        // Verificar autenticaciÃ³n y permisos
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("usuario") == null) {
+            sendError(response, "No autenticado", 401);
+            return;
+        }
+        
+        Usuario usuarioSesion = (Usuario) session.getAttribute("usuario");
+        if (!"admin".equals(usuarioSesion.getUserType())) {
+            sendError(response, "Acceso denegado. Solo administradores", 403);
+            return;
+        }
+        
+        String pathInfo = request.getPathInfo();
+        String method = request.getMethod();
+        
+        PrintWriter out = response.getWriter();
+        ApiResponse<?> apiResponse;
+        
+        try {
+            if (pathInfo == null || "/".equals(pathInfo)) {
+                // /api/users
+                if ("GET".equals(method)) {
+                    apiResponse = getAllUsers();
+                } else if ("POST".equals(method)) {
+                    apiResponse = createUser(request);
+                } else {
+                    apiResponse = ApiResponse.error("MÃ©todo no permitido", 405);
+                }
+            } else {
+                // /api/users/{id}
+                String[] pathParts = pathInfo.split("/");
+                if (pathParts.length == 2) {
+                    try {
+                        int userId = Integer.parseInt(pathParts[1]);
+                        
+                        if ("GET".equals(method)) {
+                            apiResponse = getUserById(userId);
+                        } else if ("PUT".equals(method)) {
+                            apiResponse = updateUser(userId, request);
+                        } else if ("DELETE".equals(method)) {
+                            apiResponse = deleteUser(userId);
+                        } else {
+                            apiResponse = ApiResponse.error("MÃ©todo no permitido", 405);
+                        }
+                    } catch (NumberFormatException e) {
+                        apiResponse = ApiResponse.error("ID de usuario invÃ¡lido", 400);
+                    }
+                } else {
+                    apiResponse = ApiResponse.error("Endpoint no encontrado", 404);
+                }
+            }
+            
+            response.setStatus(apiResponse.getStatusCode());
+            out.print(gson.toJson(apiResponse));
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            apiResponse = ApiResponse.error("Error interno: " + e.getMessage(), 500);
+            response.setStatus(500);
+            out.print(gson.toJson(apiResponse));
+        } finally {
+            out.flush();
+        }
+    }
+    
+    private void configureResponse(HttpServletResponse response) {
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    
+    private void sendError(HttpServletResponse response, String message, int status) throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("message", message);
+        error.put("statusCode", status);
+        
+        PrintWriter out = response.getWriter();
+        out.print(gson.toJson(error));
+        out.flush();
+    }
+    
+    /**
+     * GET /api/users
+     * Obtiene todos los usuarios (solo admin)
+     */
+    private ApiResponse<List<Usuario>> getAllUsers() {
+        try {
+            List<Usuario> usuarios = usuarioDAO.obtenerTodosUsuarios();
+            // No enviar contraseÃ±as en la respuesta
+            for (Usuario usuario : usuarios) {
+                usuario.setPassword("********");
+            }
+            return ApiResponse.success(usuarios);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error obteniendo usuarios: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * GET /api/users/{id}
+     * Obtiene un usuario por ID
+     */
+    private ApiResponse<Usuario> getUserById(int id) {
+        try {
+            Usuario usuario = usuarioDAO.obtenerUsuarioPorId(id);
+            if (usuario != null) {
+                usuario.setPassword("********");
+                return ApiResponse.success(usuario);
+            } else {
+                return ApiResponse.notFound("Usuario con ID " + id);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error obteniendo usuario: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * POST /api/users
+     * Crea un nuevo usuario (solo admin)
+     */
+    private ApiResponse<Usuario> createUser(HttpServletRequest request) {
+        try {
+            Usuario usuario = parseUserFromRequest(request);
+            
+            // Validaciones
+            if (usuario.getUsername() == null || usuario.getUsername().trim().isEmpty()) {
+                return ApiResponse.error("Username es requerido", 400);
+            }
+            if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
+                return ApiResponse.error("Password es requerido", 400);
+            }
+            if (usuario.getEmail() == null || usuario.getEmail().trim().isEmpty()) {
+                return ApiResponse.error("Email es requerido", 400);
+            }
+            
+            // Verificar unicidad
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                String checkSql = "SELECT COUNT(*) FROM usuarios WHERE username = ? OR email = ?";
+                PreparedStatement pstmt = conn.prepareStatement(checkSql);
+                pstmt.setString(1, usuario.getUsername());
+                pstmt.setString(2, usuario.getEmail());
+                ResultSet rs = pstmt.executeQuery();
+                
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return ApiResponse.error("El username o email ya estÃ¡n registrados", 409);
+                }
+            }
+            
+            boolean creado = usuarioDAO.insertarUsuario(usuario);
+            if (creado) {
+                // Obtener el usuario reciÃ©n creado
+                List<Usuario> usuarios = usuarioDAO.obtenerTodosUsuarios();
+                Usuario nuevoUsuario = usuarios.get(usuarios.size() - 1);
+                nuevoUsuario.setPassword("********");
+                
+                return ApiResponse.success("Usuario creado exitosamente", nuevoUsuario);
+            } else {
+                return ApiResponse.error("No se pudo crear el usuario", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error creando usuario: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * PUT /api/users/{id}
+     * Actualiza un usuario existente
+     */
+    private ApiResponse<Usuario> updateUser(int id, HttpServletRequest request) {
+        try {
+            // Verificar que existe
+            Usuario usuarioExistente = usuarioDAO.obtenerUsuarioPorId(id);
+            if (usuarioExistente == null) {
+                return ApiResponse.notFound("Usuario con ID " + id);
+            }
+            
+            Usuario usuarioActualizado = parseUserFromRequest(request);
+            usuarioActualizado.setId(id);
+            
+            // Si no se enviaron algunos campos, mantener los existentes
+            if (usuarioActualizado.getUsername() == null) {
+                usuarioActualizado.setUsername(usuarioExistente.getUsername());
+            }
+            if (usuarioActualizado.getPassword() == null) {
+                usuarioActualizado.setPassword(usuarioExistente.getPassword());
+            } else {
+                // Si se envÃ­a nueva contraseÃ±a, encriptar (en una app real)
+                // Por ahora la guardamos como texto plano (igual que el registro)
+            }
+            if (usuarioActualizado.getFullName() == null) {
+                usuarioActualizado.setFullName(usuarioExistente.getFullName());
+            }
+            if (usuarioActualizado.getEmail() == null) {
+                usuarioActualizado.setEmail(usuarioExistente.getEmail());
+            }
+            if (usuarioActualizado.getUserType() == null) {
+                usuarioActualizado.setUserType(usuarioExistente.getUserType());
+            }
+            
+            // Verificar que el nuevo username/email no choque con otros usuarios
+            if (!usuarioActualizado.getUsername().equals(usuarioExistente.getUsername()) ||
+                !usuarioActualizado.getEmail().equals(usuarioExistente.getEmail())) {
+                
+                try (Connection conn = DatabaseConnection.getConnection()) {
+                    String checkSql = "SELECT COUNT(*) FROM usuarios WHERE (username = ? OR email = ?) AND id != ?";
+                    PreparedStatement pstmt = conn.prepareStatement(checkSql);
+                    pstmt.setString(1, usuarioActualizado.getUsername());
+                    pstmt.setString(2, usuarioActualizado.getEmail());
+                    pstmt.setInt(3, id);
+                    ResultSet rs = pstmt.executeQuery();
+                    
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return ApiResponse.error("El nuevo username o email ya estÃ¡n en uso por otro usuario", 409);
+                    }
+                }
+            }
+            
+            boolean actualizado = usuarioDAO.actualizarUsuario(usuarioActualizado);
+            if (actualizado) {
+                Usuario usuarioFinal = usuarioDAO.obtenerUsuarioPorId(id);
+                usuarioFinal.setPassword("********");
+                return ApiResponse.success("Usuario actualizado exitosamente", usuarioFinal);
+            } else {
+                return ApiResponse.error("No se pudo actualizar el usuario", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error actualizando usuario: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * DELETE /api/users/{id}
+     * Elimina un usuario (no puede eliminarse a sÃ­ mismo)
+     */
+    private ApiResponse<Map<String, Object>> deleteUser(int id) {
+        try {
+            // Verificar que existe
+            Usuario usuario = usuarioDAO.obtenerUsuarioPorId(id);
+            if (usuario == null) {
+                return ApiResponse.notFound("Usuario con ID " + id);
+            }
+            
+            // Obtener usuario de sesiÃ³n para verificar que no se elimina a sÃ­ mismo
+            // (esto se verificarÃ­a en el mÃ©todo service, ya estamos despuÃ©s de esa validaciÃ³n)
+            
+            boolean eliminado = usuarioDAO.eliminarUsuario(id);
+            if (eliminado) {
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("id", id);
+                responseData.put("message", "Usuario eliminado exitosamente");
+                responseData.put("usuarioEliminado", usuario.getUsername());
+                
+                return ApiResponse.success(responseData);
+            } else {
+                return ApiResponse.error("No se pudo eliminar el usuario", 500);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ApiResponse.error("Error eliminando usuario: " + e.getMessage(), 500);
+        }
+    }
+    
+    /**
+     * Parsea un usuario desde la solicitud
+     */
+    private Usuario parseUserFromRequest(HttpServletRequest request) throws IOException {
+        Usuario usuario = new Usuario();
+        
+        // Intentar leer como JSON
+        if ("application/json".equals(request.getContentType())) {
+            BufferedReader reader = request.getReader();
+            StringBuilder jsonBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                jsonBuilder.append(line);
+            }
+            
+            if (jsonBuilder.length() > 0) {
+                JsonObject jsonObject = gson.fromJson(jsonBuilder.toString(), JsonObject.class);
+                
+                if (jsonObject.has("username")) usuario.setUsername(jsonObject.get("username").getAsString());
+                if (jsonObject.has("password")) usuario.setPassword(jsonObject.get("password").getAsString());
+                if (jsonObject.has("fullName")) usuario.setFullName(jsonObject.get("fullName").getAsString());
+                if (jsonObject.has("email")) usuario.setEmail(jsonObject.get("email").getAsString());
+                if (jsonObject.has("userType")) usuario.setUserType(jsonObject.get("userType").getAsString());
+                
+                return usuario;
+            }
+        }
+        
+        // Usar parÃ¡metros normales
+        usuario.setUsername(request.getParameter("username"));
+        usuario.setPassword(request.getParameter("password"));
+        usuario.setFullName(request.getParameter("fullName"));
+        usuario.setEmail(request.getParameter("email"));
+        usuario.setUserType(request.getParameter("userType"));
+        
+        return usuario;
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\controller\AppointmentServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.controller;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/appointments")
+public class AppointmentServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+        response.setContentType("text/html");
+        PrintWriter out = response.getWriter();
+        
+        out.println("<!DOCTYPE html>");
+        out.println("<html><head><title>Citas</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial; padding: 20px; }");
+        out.println("table { border-collapse: collapse; width: 100%; }");
+        out.println("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+        out.println("th { background-color: #f2f2f2; }");
+        out.println("</style>");
+        out.println("</head><body>");
+        out.println("<h2>?? Gestiï¿½n de Citas</h2>");
+        out.println("<table>");
+        out.println("<tr><th>ID</th><th>Paciente</th><th>Fecha</th><th>Hora</th><th>Estado</th></tr>");
+        out.println("<tr><td>1</td><td>Juan Pï¿½rez</td><td>2024-01-15</td><td>10:00 AM</td><td>Programada</td></tr>");
+        out.println("<tr><td>2</td><td>Marï¿½a Garcï¿½a</td><td>2024-01-16</td><td>02:30 PM</td><td>Completada</td></tr>");
+        out.println("</table>");
+        out.println("<br><a href='dashboard.jsp'>Volver al dashboard</a>");
+        out.println("</body></html>");
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\controller\CrudTestServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.controller;
+
+import com.hypnoelectronic.dao.ProductoDAO;
+import com.hypnoelectronic.dao.UsuarioDAO;
+import com.hypnoelectronic.model.Producto;
+import com.hypnoelectronic.model.Usuario;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.List;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+@WebServlet("/crud-test")
+public class CrudTestServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        
+        response.setContentType("text/html;charset=UTF-8");
+        PrintWriter out = response.getWriter();
+        
+        out.println("<!DOCTYPE html>");
+        out.println("<html>");
+        out.println("<head>");
+        out.println("<title>Prueba CRUD - Evidencia SENA</title>");
+        out.println("<style>");
+        out.println("body { font-family: Arial, sans-serif; margin: 40px; }");
+        out.println("table { border-collapse: collapse; width: 100%; margin: 20px 0; }");
+        out.println("th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }");
+        out.println("th { background-color: #4CAF50; color: white; }");
+        out.println(".success { color: green; font-weight: bold; }");
+        out.println(".error { color: red; font-weight: bold; }");
+        out.println("</style>");
+        out.println("</head>");
+        out.println("<body>");
+        out.println("<h1>Prueba de Operaciones CRUD - Evidencia GA7-220501096-AA2</h1>");
+        
+        // Instanciar DAOs
+        UsuarioDAO usuarioDAO = new UsuarioDAO();
+        ProductoDAO productoDAO = new ProductoDAO();
+        
+        // ========== PRUEBAS CON USUARIOS ==========
+        out.println("<h2>1. Operaciones CRUD con Usuarios</h2>");
+        
+        // INSERTAR usuario
+        Usuario nuevoUsuario = new Usuario("testuser", "test123", "Usuario de Prueba", "test@email.com", "patient");
+        boolean insertado = usuarioDAO.insertarUsuario(nuevoUsuario);
+        out.println("<p class='" + (insertado ? "success" : "error") + "'>");
+        out.println("âœ“ INSERTAR usuario: " + (insertado ? "Ã‰XITO" : "FALLO"));
+        out.println("</p>");
+        
+        // LEER todos los usuarios
+        List<Usuario> usuarios = usuarioDAO.obtenerTodosUsuarios();
+        out.println("<h3>Lista de Usuarios (SELECT):</h3>");
+        out.println("<table>");
+        out.println("<tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Email</th><th>Tipo</th></tr>");
+        for (Usuario u : usuarios) {
+            out.println("<tr>");
+            out.println("<td>" + u.getId() + "</td>");
+            out.println("<td>" + u.getUsername() + "</td>");
+            out.println("<td>" + u.getFullName() + "</td>");
+            out.println("<td>" + u.getEmail() + "</td>");
+            out.println("<td>" + u.getUserType() + "</td>");
+            out.println("</tr>");
+        }
+        out.println("</table>");
+        
+        // ========== PRUEBAS CON PRODUCTOS ==========
+        out.println("<h2>2. Operaciones CRUD con Productos</h2>");
+        
+        // INSERTAR producto
+        Producto nuevoProducto = new Producto("Nuevo Producto", "DescripciÃ³n del nuevo producto", 99.99, 100);
+        boolean productoInsertado = productoDAO.insertarProducto(nuevoProducto);
+        out.println("<p class='" + (productoInsertado ? "success" : "error") + "'>");
+        out.println("âœ“ INSERTAR producto: " + (productoInsertado ? "Ã‰XITO" : "FALLO"));
+        out.println("</p>");
+        
+        // LEER todos los productos
+        List<Producto> productos = productoDAO.obtenerTodosProductos();
+        out.println("<h3>Lista de Productos (SELECT):</h3>");
+        out.println("<table>");
+        out.println("<tr><th>ID</th><th>Nombre</th><th>DescripciÃ³n</th><th>Precio</th><th>Stock</th></tr>");
+        for (Producto p : productos) {
+            out.println("<tr>");
+            out.println("<td>" + p.getId() + "</td>");
+            out.println("<td>" + p.getNombre() + "</td>");
+            out.println("<td>" + p.getDescripcion() + "</td>");
+            out.println("<td>$" + p.getPrecio() + "</td>");
+            out.println("<td>" + p.getStock() + "</td>");
+            out.println("</tr>");
+        }
+        out.println("</table>");
+        
+        // UPDATE de un producto (si hay productos)
+        if (!productos.isEmpty()) {
+            Producto primerProducto = productos.get(0);
+            primerProducto.setPrecio(primerProducto.getPrecio() + 10);
+            boolean actualizado = productoDAO.actualizarProducto(primerProducto);
+            out.println("<p class='" + (actualizado ? "success" : "error") + "'>");
+            out.println("âœ“ UPDATE producto ID " + primerProducto.getId() + ": " + (actualizado ? "Ã‰XITO" : "FALLO"));
+            out.println("</p>");
+        }
+        
+        // DELETE de un producto (si hay mÃ¡s de 1)
+        if (productos.size() > 1) {
+            Producto ultimoProducto = productos.get(productos.size() - 1);
+            boolean eliminado = productoDAO.eliminarProducto(ultimoProducto.getId());
+            out.println("<p class='" + (eliminado ? "success" : "error") + "'>");
+            out.println("âœ“ DELETE producto ID " + ultimoProducto.getId() + ": " + (eliminado ? "Ã‰XITO" : "FALLO"));
+            out.println("</p>");
+        }
+        
+        out.println("<hr>");
+        out.println("<h3>Resumen de operaciones CRUD implementadas:</h3>");
+        out.println("<ul>");
+        out.println("<li><strong>CREATE</strong>: INSERT INTO tablas</li>");
+        out.println("<li><strong>READ</strong>: SELECT con WHERE y SELECT *</li>");
+        out.println("<li><strong>UPDATE</strong>: UPDATE con parÃ¡metros</li>");
+        out.println("<li><strong>DELETE</strong>: DELETE con condiciÃ³n</li>");
+        out.println("</ul>");
+        
+        out.println("<p><strong>Nota para el instructor:</strong> Esta pÃ¡gina demuestra el uso completo de JDBC con operaciones CRUD, requerido para la evidencia GA7-220501096-AA2-EV01.</p>");
+        
+        out.println("</body>");
+        out.println("</html>");
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\controller\HomeServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.controller;
+
+import com.hypnoelectronic.dao.ProductoDAO;
+import com.hypnoelectronic.model.Producto;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+
+@WebServlet("/home")
+public class HomeServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        try {
+            ProductoDAO productoDAO = new ProductoDAO();
+            List<Producto> listaProductos = productoDAO.listar();
+            
+            request.setAttribute("productos", listaProductos);
+            request.getRequestDispatcher("index.jsp").forward(request, response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error al cargar el catÃ¡logo");
+        }
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\controller\LoginServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.controller;
+
+import com.hypnoelectronic.dao.UsuarioDAO;
+import com.hypnoelectronic.model.Usuario;
+import java.io.IOException;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+@WebServlet("/login")
+public class LoginServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+
+        response.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+        // Mostrar formulario de login
+        request.getRequestDispatcher("/login.jsp").forward(request, response);
+    }
+    
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        String username = request.getParameter("username");
+        String password = request.getParameter("password");
+        
+        System.out.println("[LoginServlet] Intentando login para usuario: " + username);
+        
+        try {
+            UsuarioDAO usuarioDAO = new UsuarioDAO();
+            Usuario usuario = usuarioDAO.validarLogin(username, password);
+            
+            if (usuario != null) {
+                System.out.println("[LoginServlet] Login exitoso: " + usuario.getFullName());
+                
+                // Crear sesiÃ³n con el objeto Usuario completo
+                HttpSession session = request.getSession();
+                session.setAttribute("usuario", usuario);
+                session.setAttribute("username", usuario.getUsername());
+                session.setAttribute("userType", usuario.getUserType());
+                
+                // Redirigir segÃºn tipo de usuario
+                if ("admin".equals(usuario.getUserType())) {
+                    response.sendRedirect("dashboard.jsp");
+                } else {
+                    response.sendRedirect("dashboard.jsp");
+                }
+                
+            } else {
+                System.out.println("[LoginServlet] Login fallido para: " + username);
+                
+                // Credenciales incorrectas
+                request.setAttribute("errorMessage", "Usuario o contraseÃ±a incorrectos");
+                request.getRequestDispatcher("/login.jsp").forward(request, response);
+            }
+        } catch (Exception e) {
+            System.err.println("[LoginServlet] Error: " + e.getMessage());
+            e.printStackTrace();
+            request.setAttribute("errorMessage", "Error en el servidor: " + e.getMessage());
+            request.getRequestDispatcher("/error.jsp").forward(request, response);
+        }
+    }
+
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\controller\RegisterServlet.java
+--------------------------------------------------
+package com.hypnoelectronic.controller;
+
+import com.hypnoelectronic.dao.UsuarioDAO;
+import com.hypnoelectronic.model.Usuario;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@WebServlet("/register")
+public class RegisterServlet extends HttpServlet {
+    
+    private UsuarioDAO usuarioDAO = new UsuarioDAO();
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
+        // 1. Recoger datos del formulario
+        String fullName = request.getParameter("fullName");
+        String email = request.getParameter("email");
+        String username = request.getParameter("username");
+        String password = request.getParameter("password");
+        String userType = request.getParameter("userType");
+
+        // 2. Crear objeto Usuario
+        Usuario nuevoUsuario = new Usuario();
+        nuevoUsuario.setFullName(fullName);
+        nuevoUsuario.setEmail(email);
+        nuevoUsuario.setUsername(username);
+        nuevoUsuario.setPassword(password);
+        nuevoUsuario.setUserType(userType);
+
+        // 3. Intentar guardar en la base de datos
+        if (usuarioDAO.registrar(nuevoUsuario)) {
+            // Si funciona, lo mandamos al login con Ã©xito
+            response.sendRedirect("login.jsp?success=true");
+        } else {
+            // Si falla, volvemos al registro con error
+            request.setAttribute("errorMessage", "No se pudo crear la cuenta. El usuario o correo ya existen.");
+            request.getRequestDispatcher("register.jsp").forward(request, response);
+        }
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\dao\ProductoDAO.java
+--------------------------------------------------
+package com.hypnoelectronic.dao;
+
+import com.hypnoelectronic.model.Producto;
+import com.hypnoelectronic.util.DatabaseConnection;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProductoDAO {
+
+    // MÃ©todo para su nueva pÃ¡gina de inicio
+    public List<Producto> listar() {
+        return obtenerTodosProductos();
+    }
+
+    // MÃ©todo que pide la API y el TestServlet
+    public List<Producto> obtenerTodosProductos() {
+        List<Producto> lista = new ArrayList<>();
+        String sql = "SELECT * FROM productos";
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(mapearProducto(rs));
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return lista;
+    }
+
+    public Producto obtenerProductoPorId(int id) {
+        String sql = "SELECT * FROM productos WHERE id = ?";
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapearProducto(rs);
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
+    }
+
+    public boolean insertarProducto(Producto p) {
+        String sql = "INSERT INTO productos (nombre, descripcion, imagen_url, categoria, precio, stock) VALUES (?,?,?,?,?,?)";
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, p.getNombre());
+            ps.setString(2, p.getDescripcion());
+            ps.setString(3, p.getImagen_url());
+            ps.setString(4, p.getCategoria());
+            ps.setDouble(5, p.getPrecio());
+            ps.setInt(6, p.getStock());
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
+    public boolean actualizarProducto(Producto p) {
+        String sql = "UPDATE productos SET nombre=?, descripcion=?, imagen_url=?, categoria=?, precio=?, stock=? WHERE id=?";
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, p.getNombre());
+            ps.setString(2, p.getDescripcion());
+            ps.setString(3, p.getImagen_url());
+            ps.setString(4, p.getCategoria());
+            ps.setDouble(5, p.getPrecio());
+            ps.setInt(6, p.getStock());
+            ps.setInt(7, p.getId());
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
+    public boolean eliminarProducto(int id) {
+        String sql = "DELETE FROM productos WHERE id = ?";
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) { e.printStackTrace(); return false; }
+    }
+
+    private Producto mapearProducto(ResultSet rs) throws SQLException {
+        Producto p = new Producto();
+        p.setId(rs.getInt("id"));
+        p.setNombre(rs.getString("nombre"));
+        p.setDescripcion(rs.getString("descripcion"));
+        p.setImagen_url(rs.getString("imagen_url"));
+        p.setCategoria(rs.getString("categoria"));
+        p.setPrecio(rs.getDouble("precio"));
+        p.setStock(rs.getInt("stock"));
+        return p;
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\dao\UsuarioDAO.java
+--------------------------------------------------
+package com.hypnoelectronic.dao;
+
+import com.hypnoelectronic.model.Usuario;
+import com.hypnoelectronic.util.DatabaseConnection;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class UsuarioDAO {
+
+    // LOGIN: Conecta con roles para saber quÃ© tipo de usuario es
+    public Usuario login(String username, String password) {
+        Usuario user = null;
+        String sql = "SELECT u.*, r.nombre_role FROM usuarios u " +
+                     "INNER JOIN roles r ON u.role_id = r.idrole " +
+                     "WHERE u.username = ? AND u.password = ?";
+        
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            
+            ps.setString(1, username);
+            ps.setString(2, password);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                user = extraerUsuarioDeResultSet(rs);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return user;
+    }
+
+    // REGISTRO: Inserta en la nueva tabla con role_id
+    public boolean registrar(Usuario usuario) {
+        // En nuestro script: 1 es admin, 2 es cliente
+        int roleId = "admin".equals(usuario.getUserType()) ? 1 : 2;
+        
+        String sql = "INSERT INTO usuarios (nombre_completo, email, username, password, role_id) VALUES (?, ?, ?, ?, ?)";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            
+            pstmt.setString(1, usuario.getFullName());
+            pstmt.setString(2, usuario.getEmail());
+            pstmt.setString(3, usuario.getUsername());
+            pstmt.setString(4, usuario.getPassword());
+            pstmt.setInt(5, roleId);
+            
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // LISTAR TODOS (Para el Dashboard del Admin)
+    public List<Usuario> obtenerTodosUsuarios() {
+        List<Usuario> usuarios = new ArrayList<>();
+        String sql = "SELECT u.*, r.nombre_role FROM usuarios u INNER JOIN roles r ON u.role_id = r.idrole";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                usuarios.add(extraerUsuarioDeResultSet(rs));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return usuarios;
+    }
+
+    // MÃ©todo auxiliar corregido con los nombres de MySQL Workbench
+    private Usuario extraerUsuarioDeResultSet(ResultSet rs) throws SQLException {
+        Usuario usuario = new Usuario();
+        usuario.setId(rs.getInt("id_usuario"));
+        usuario.setUsername(rs.getString("username"));
+        usuario.setPassword(rs.getString("password"));
+        usuario.setFullName(rs.getString("nombre_completo"));
+        usuario.setEmail(rs.getString("email"));
+        
+        // Intentamos traer el nombre del rol si viene en la consulta
+        try {
+            usuario.setUserType(rs.getString("nombre_role"));
+        } catch (SQLException e) {
+            usuario.setUserType("cliente"); 
+        }
+        return usuario;
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\dto\ApiResponse.java
+--------------------------------------------------
+package com.hypnoelectronic.dto;
+
+/**
+ * DTO para respuestas estandarizadas de la API REST
+ * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
+ */
+public class ApiResponse<T> {
+    private boolean success;
+    private String message;
+    private T data;
+    private int statusCode;
+
+    // Constructores
+    public ApiResponse() {
+        this.success = true;
+        this.message = "OperaciÃ³n exitosa";
+        this.statusCode = 200;
+    }
+
+    public ApiResponse(boolean success, String message, T data, int statusCode) {
+        this.success = success;
+        this.message = message;
+        this.data = data;
+        this.statusCode = statusCode;
+    }
+
+    // MÃ©todos estÃ¡ticos para respuestas comunes
+    public static <T> ApiResponse<T> success(T data) {
+        return new ApiResponse<>(true, "OperaciÃ³n exitosa", data, 200);
+    }
+
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(true, message, data, 200);
+    }
+
+    public static <T> ApiResponse<T> error(String message) {
+        return new ApiResponse<>(false, message, null, 400);
+    }
+
+    public static <T> ApiResponse<T> error(String message, int statusCode) {
+        return new ApiResponse<>(false, message, null, statusCode);
+    }
+
+    public static <T> ApiResponse<T> notFound(String resource) {
+        return new ApiResponse<>(false, resource + " no encontrado", null, 404);
+    }
+
+    // Getters y Setters
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public T getData() {
+        return data;
+    }
+
+    public void setData(T data) {
+        this.data = data;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\filtro\CORSFilter.java
+--------------------------------------------------
+package com.hypnoelectronic.filtro;
+
+import javax.servlet.*;
+import javax.servlet.annotation.WebFilter;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@WebFilter("/*")
+public class CORSFilter implements Filter {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+        httpResponse.setHeader("Access-Control-Allow-Origin", "*");
+        httpResponse.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        httpResponse.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        chain.doFilter(request, response);
+    }
+
+    public void init(FilterConfig filterConfig) throws ServletException {}
+    public void destroy() {}
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\model\Producto.java
+--------------------------------------------------
+package com.hypnoelectronic.model;
+
+public class Producto {
+    private int id;
+    private String nombre;
+    private String descripcion;
+    private String imagen_url; // La pieza que faltaba
+    private String categoria;
+    private double precio;
+    private int stock;
+
+    // Constructores
+    public Producto() {}
+    
+    public Producto(String nombre, String descripcion, double precio, int stock) {
+        this.nombre = nombre;
+        this.descripcion = descripcion;
+        this.precio = precio;
+        this.stock = stock;
+    }
+
+    public Producto(int id, String nombre, String descripcion, String imagen_url, String categoria, double precio, int stock) {
+        this.id = id;
+        this.nombre = nombre;
+        this.descripcion = descripcion;
+        this.imagen_url = imagen_url;
+        this.categoria = categoria;
+        this.precio = precio;
+        this.stock = stock;
+    }
+    
+    // Getters y Setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    
+    public String getNombre() { return nombre; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
+    
+    public String getDescripcion() { return descripcion; }
+    public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
+
+    public String getImagen_url() { return imagen_url; }
+    public void setImagen_url(String imagen_url) { this.imagen_url = imagen_url; }
+
+    public String getCategoria() { return categoria; }
+    public void setCategoria(String categoria) { this.categoria = categoria; }
+    
+    public double getPrecio() { return precio; }
+    public void setPrecio(double precio) { this.precio = precio; }
+    
+    public int getStock() { return stock; }
+    public void setStock(int stock) { this.stock = stock; }
+    
+    @Override
+    public String toString() {
+        return "Producto [id=" + id + ", nombre=" + nombre + ", categoria=" + categoria + ", precio=" + precio + "]";
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\model\Usuario.java
+--------------------------------------------------
+package com.hypnoelectronic.model;
+
+import java.sql.Timestamp;
+
+public class Usuario {
+    private int id;
+    private String username;
+    private String password;
+    private String fullName;
+    private String email;
+    private String userType;
+    private Timestamp createdAt;
+    
+    // Constructores
+    public Usuario() {}
+    
+    public Usuario(String username, String password, String fullName, String email, String userType) {
+        this.username = username;
+        this.password = password;
+        this.fullName = fullName;
+        this.email = email;
+        this.userType = userType;
+    }
+    
+    // Getters y Setters
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+    
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+    
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    
+    public String getUserType() { return userType; }
+    public void setUserType(String userType) { this.userType = userType; }
+    
+    public Timestamp getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Timestamp createdAt) { this.createdAt = createdAt; }
+    
+    @Override
+    public String toString() {
+        return "Usuario [id=" + id + ", username=" + username + ", fullName=" + fullName + ", email=" + email + ", userType=" + userType + "]";
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\java\com\hypnoelectronic\util\DatabaseConnection.java
+--------------------------------------------------
+package com.hypnoelectronic.util;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseConnection {
+    
+    private static final String URL = "jdbc:mysql://localhost:3306/HypnoElectronic";
+    private static final String USER = "root";
+    private static final String PASSWORD = "0000"; // Tu contraseÃ±a
+    
+    static {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            System.out.println("Driver MySQL cargado correctamente");
+        } catch (ClassNotFoundException e) {
+            System.err.println("ERROR: No se pudo cargar el driver MySQL");
+            e.printStackTrace();
+            throw new RuntimeException("Error cargando driver MySQL", e);
+        }
+    }
+    
+    public static Connection getConnection() throws SQLException {
+        System.out.println("Intentando conectar a: " + URL);
+        Connection conn = DriverManager.getConnection(URL, USER, PASSWORD);
+        System.out.println("Â¡ConexiÃ³n exitosa a la base de datos!");
+        return conn;
+    }
+    
+    // MÃ©todo de prueba (opcional)
+    public static void main(String[] args) {
+        try {
+            Connection conn = getConnection();
+            System.out.println("Prueba de conexiÃ³n: OK");
+            conn.close();
+        } catch (SQLException e) {
+            System.err.println("Error de conexiÃ³n: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+
+
+--------------------------------------------------
+ARCHIVO: src\main\resources\db.properties
+--------------------------------------------------
+# Configuración Base de Datos - HypnoElectronic
+db.url=jdbc:mysql://localhost:3306/mydb
+db.user=root
+db.password=0000
+db.driver=com.mysql.cj.jdbc.Driver
+
+# Configuración adicional
+db.pool.size=10
+db.timeout=5000
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\carrito.jsp
+--------------------------------------------------
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Carrito - HypnoElectronic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <%@ include file="includes/navbar.jsp" %>
+
+    <div class="container mt-5">
+        <div class="p-5 rounded-3 text-center" style="background-color: var(--card-bg); border: 2px dashed #333;">
+            <h2 style="color: var(--neon-blue);">Tu carrito estÃ¡ vacÃ­o</h2>
+            <p class="text-secondary">Parece que aÃºn no has elegido tu prÃ³ximo perifÃ©rico.</p>
+            <a href="home" class="btn btn-neon mt-3">VOLVER AL CATÃLOGO</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\configuracion.jsp
+--------------------------------------------------
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - HypnoElectronic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <%@ include file="includes/navbar.jsp" %>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-5">
+                <div class="card p-4 shadow-lg" style="background-color: var(--card-bg); border: 1px solid #333; border-radius: 15px;">
+                    <h2 class="text-center mb-4" style="color: var(--neon-blue);">Registro de Usuario</h2>
+                    
+                    <% if (request.getParameter("success") != null) { %>
+                        <div class="alert alert-success bg-dark text-success border-success">
+                            Â¡Registro exitoso! Ahora puedes iniciar sesiÃ³n.
+                        </div>
+                    <% } %>
+                    
+                    <form action="register" method="post">
+                        <div class="mb-3">
+                            <input type="text" name="fullName" class="form-control bg-dark text-white border-secondary" placeholder="Nombre completo" required>
+                        </div>
+                        <div class="mb-3">
+                            <input type="email" name="email" class="form-control bg-dark text-white border-secondary" placeholder="Correo electrÃ³nico" required>
+                        </div>
+                        <div class="mb-3">
+                            <input type="text" name="username" class="form-control bg-dark text-white border-secondary" placeholder="Usuario" required>
+                        </div>
+                        <div class="mb-3">
+                            <input type="password" name="password" class="form-control bg-dark text-white border-secondary" placeholder="ContraseÃ±a" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small">Tipo de cuenta</label>
+                            <select name="userType" class="form-select bg-dark text-white border-secondary">
+                                <option value="patient">Cliente</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-neon w-100 fw-bold">CREAR CUENTA</button>
+                    </form>
+                    
+                    <p class="mt-4 text-center">
+                        <a href="login.jsp" class="text-secondary text-decoration-none small">Â¿Ya tienes cuenta? <span style="color: var(--neon-blue);">Inicia sesiÃ³n</span></a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\dashboard.jsp
+--------------------------------------------------
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ page import="com.hypnoelectronic.model.Usuario" %>
+<%
+    Usuario userSession = (Usuario) session.getAttribute("user");
+    if (userSession == null || !"admin".equals(userSession.getUserType())) {
+        response.sendRedirect("login.jsp");
+        return;
+    }
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Control - HypnoElectronic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <%@ include file="includes/navbar.jsp" %>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="p-4 rounded-3" style="background-color: var(--card-bg); border-left: 5px solid var(--neon-blue);">
+                    <h1 class="display-5 fw-bold" style="color: var(--neon-blue);">
+                        Bienvenido, <%= session.getAttribute("username") %>!
+                    </h1>
+                    <p class="lead text-secondary">Panel de control de HypnoElectronic</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="mb-4 text-white">Módulos del Sistema</h2>
+        <div class="row g-4">
+            
+            <div class="col-md-3">
+                <div class="card h-100 p-3 text-center" style="background-color: var(--card-bg); border: 1px solid #333;">
+                    <div class="card-body">
+                        <div class="mb-3" style="font-size: 2rem; color: var(--neon-blue);">👥</div>
+                        <h5 class="card-title text-white">Usuarios</h5>
+                        <p class="card-text text-secondary small">Administrar perfiles y permisos.</p>
+                        <a href="usuarios.jsp" class="btn btn-outline-info btn-sm w-100">Entrar</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card h-100 p-3 text-center" style="background-color: var(--card-bg); border: 1px solid #333;">
+                    <div class="card-body">
+                        <div class="mb-3" style="font-size: 2rem; color: var(--neon-blue);">📦</div>
+                        <h5 class="card-title text-white">Inventario</h5>
+                        <p class="card-text text-secondary small">Control de stock de periféricos.</p>
+                        <a href="home" class="btn btn-outline-info btn-sm w-100">Ver Catálogo</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card h-100 p-3 text-center" style="background-color: var(--card-bg); border: 1px solid #333;">
+                    <div class="card-body">
+                        <div class="mb-3" style="font-size: 2rem; color: var(--neon-blue);">📊</div>
+                        <h5 class="card-title text-white">Reportes</h5>
+                        <p class="card-text text-secondary small">Estadísticas de ventas y flujo.</p>
+                        <a href="#" class="btn btn-outline-info btn-sm w-100">Generar</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card h-100 p-3 text-center" style="background-color: var(--card-bg); border: 1px solid #333;">
+                    <div class="card-body">
+                        <div class="mb-3" style="font-size: 2rem; color: var(--neon-blue);">⚙️</div>
+                        <h5 class="card-title text-white">Configuración</h5>
+                        <p class="card-text text-secondary small">Ajustes generales del sistema.</p>
+                        <a href="configuracion.jsp" class="btn btn-outline-info btn-sm w-100">Ajustar</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="mt-5 pt-3 border-top border-secondary text-center">
+             <a href="logout.jsp" class="btn btn-danger btn-sm">Cerrar Sesión Segura</a>
+             <a href="configuracion.jsp" class="btn btn-link text-secondary text-decoration-none">Registrar nuevo usuario</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\index.jsp
+--------------------------------------------------
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HypnoElectronic | Tienda de Periféricos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; }
+        .product-card { 
+            transition: transform 0.3s; 
+            border: 1px solid #333; 
+            border-radius: 15px; 
+            overflow: hidden;
+            background-color: var(--card-bg) !important;
+        }
+        .product-card:hover { 
+            transform: translateY(-10px); 
+            box-shadow: 0 0 20px var(--neon-blue); 
+            border-color: var(--neon-blue);
+        }
+        .hero-section { 
+            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('https://images.unsplash.com/photo-1547082299-de196ea013d6?w=1200'); 
+            background-size: cover; 
+            background-position: center;
+            height: 350px; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            border-bottom: 1px solid #333;
+        }
+        .text-neon { color: var(--neon-blue); }
+    </style>
+</head>
+<body>
+    
+    <%@ include file="includes/navbar.jsp" %>
+
+    <header class="hero-section text-center">
+        <div>
+            <h1 class="display-3 fw-bold">Potencia tu <span class="text-neon">Setup</span></h1>
+            <p class="lead">Los mejores periféricos para gamers y profesionales en Cajicá.</p>
+        </div>
+    </header>
+
+    <div class="container my-5">
+        <h2 class="text-center mb-5 fw-bold text-white">Nuestro Catálogo</h2>
+        <div class="row g-4">
+            
+            <c:forEach var="prod" items="${productos}">
+                <div class="col-md-4">
+                    <div class="card product-card h-100 shadow-sm text-white">
+                        <img src="${prod.imagen_url}" class="card-img-top" alt="${prod.nombre}" style="height: 220px; object-fit: cover; filter: brightness(0.9);">
+                        <div class="card-body d-flex flex-column">
+                            <span class="badge mb-2 w-auto align-self-start" style="background-color: var(--neon-blue); color: black;">${prod.categoria}</span>
+                            <h5 class="card-title fw-bold">${prod.nombre}</h5>
+                            <p class="card-text text-secondary small">${prod.descripcion}</p>
+                            <div class="mt-auto">
+                                <h4 class="text-neon fw-bold">$${prod.precio} COP</h4>
+                                <p class="small text-muted">Disponibles: ${prod.stock} unidades</p>
+                                <a href="login.jsp" class="btn btn-neon w-100 fw-bold mt-2">AÑADIR AL CARRITO</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </c:forEach>
+
+            <c:if test="${empty productos}">
+                <div class="text-center w-100 py-5">
+                    <p class="text-secondary italic">No hay productos en inventario actualmente.</p>
+                    <a href="home" class="btn btn-outline-info">Actualizar Inventario</a>
+                </div>
+            </c:if>
+
+        </div>
+    </div>
+
+    <footer class="text-secondary text-center py-5 border-top border-dark" style="background-color: #000;">
+        <p class="small mb-0">&copy; 2026 HypnoElectronic - Cajicá, Colombia.</p>
+        <p class="small text-muted">Desarrollado por Miguel Castillo Rodero</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\login.jsp
+--------------------------------------------------
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - HypnoElectronic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <%@ include file="includes/navbar.jsp" %>
+
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-4">
+                
+                <% 
+                    String message = request.getParameter("message");
+                    if ("logout_success".equals(message)) {
+                %>
+                    <div class="alert alert-info bg-dark text-info border-info text-center mb-4">
+                        ✅ Sesión cerrada correctamente
+                    </div>
+                <% } %>
+
+                <div class="card p-4 shadow-lg" style="background-color: var(--card-bg); border: 1px solid #333; border-radius: 15px;">
+                    <h2 class="text-center mb-4" style="color: var(--neon-blue);">Iniciar Sesión</h2>
+                    
+                    <% if(request.getAttribute("errorMessage") != null) { %>
+                        <div class="alert alert-danger bg-dark text-danger border-danger small text-center">
+                            <%= request.getAttribute("errorMessage") %>
+                        </div>
+                    <% } %>
+                    
+                    <form action="login" method="POST">
+                        <div class="mb-3">
+                            <label for="username" class="form-label text-secondary small">Usuario</label>
+                            <input type="text" id="username" name="username" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label text-secondary small">Contraseña</label>
+                            <input type="password" id="password" name="password" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-neon w-100 fw-bold mt-3">INGRESAR AL SISTEMA</button>
+                    </form>
+                    
+                    <p class="mt-4 text-center">
+                        <a href="register.jsp" class="text-secondary text-decoration-none small">
+                            ¿No tienes cuenta? <span style="color: var(--neon-blue);">Regístrate aquí</span>
+                        </a>
+                    </p>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="home" class="text-muted small text-decoration-none">← Volver al catálogo</a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\logout.jsp
+--------------------------------------------------
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%
+    // 1. Invalidar la sesión actual para borrar los datos del usuario en memoria
+    if (session != null) {
+        session.invalidate();
+    }
+    
+    // 2. Redirigir al login enviando el parámetro exacto que espera nuestro login.jsp
+    // Usamos "message=logout_success" para que coincida con la validación del archivo anterior.
+    response.sendRedirect("login.jsp?message=logout_success");
+%>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cerrando sesión - HypnoElectronic</title>
+    <style>
+        body { background-color: #121212; color: #00d4ff; font-family: Arial; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    </style>
+</head>
+<body>
+    <p>Saliendo del sistema de forma segura...</p>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\register.jsp
+--------------------------------------------------
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro - HypnoElectronic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <%@ include file="includes/navbar.jsp" %>
+
+    <div class="container">
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-5">
+                
+                <%
+                    String errorMessage = (String) request.getAttribute("errorMessage");
+                    String success = request.getParameter("success");
+                    
+                    if (errorMessage != null) {
+                %>
+                    <div class="alert alert-danger bg-dark text-danger border-danger text-center">
+                        <strong>Error:</strong> <%= errorMessage %>
+                    </div>
+                <%
+                    }
+                    
+                    if ("true".equals(success)) {
+                %>
+                    <div class="alert alert-success bg-dark text-success border-success text-center">
+                        <strong>Â¡Ã‰xito!</strong> Usuario registrado correctamente. 
+                        <br><a href="login.jsp" class="text-success fw-bold">Iniciar sesiÃ³n ahora</a>
+                    </div>
+                <%
+                    }
+                %>
+                
+                <div class="card p-4 shadow-lg" style="background-color: var(--card-bg); border: 1px solid #333; border-radius: 15px;">
+                    <h2 class="text-center mb-4" style="color: var(--neon-blue);">Crear Cuenta</h2>
+                    
+                    <form action="register" method="post">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small">Nombre completo</label>
+                            <input type="text" name="fullName" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small">Correo electrÃ³nico</label>
+                            <input type="email" name="email" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small">Nombre de usuario</label>
+                            <input type="text" name="username" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small">ContraseÃ±a</label>
+                            <input type="password" name="password" class="form-control bg-dark text-white border-secondary" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small">Tipo de usuario</label>
+                            <select name="userType" class="form-select bg-dark text-white border-secondary">
+                                <option value="cliente">Cliente</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-neon w-100 fw-bold mt-3">REGISTRARSE</button>
+                    </form>
+                    
+                    <p class="mt-4 text-center">
+                        <a href="login.jsp" class="text-secondary text-decoration-none small">
+                            Â¿Ya tienes cuenta? <span style="color: var(--neon-blue);">Inicia sesiÃ³n</span>
+                        </a>
+                    </p>
+                </div>
+            </div>  
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\includes\navbar.jsp
+--------------------------------------------------
+<%@ page pageEncoding="UTF-8" %>
+<%-- Archivo: src/main/webapp/includes/navbar.jsp --%>
+<style>
+    :root {
+        --neon-blue: #00d4ff;
+        --dark-bg: #121212;
+        --card-bg: #1e1e1e;
+    }
+    
+    /* Estilos base para que hereden todas las pÃ¡ginas */
+    body { 
+        background-color: var(--dark-bg); 
+        color: white; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* CorrecciÃ³n para que los textos de los formularios se vean */
+    label.form-label, .text-secondary {
+        color: #adb5bd !important; /* Gris claro para que resalte en el fondo oscuro */
+    }
+
+    .navbar { 
+        background-color: #000 !important; 
+        border-bottom: 2px solid var(--neon-blue); 
+    }
+    
+    .nav-link { color: white !important; }
+    
+    .nav-link:hover { 
+        color: var(--neon-blue) !important; 
+        text-shadow: 0 0 8px var(--neon-blue);
+    }
+
+    .btn-neon { 
+        border: 1px solid var(--neon-blue); 
+        color: var(--neon-blue) !important;
+        transition: 0.3s;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .btn-neon:hover { 
+        background: var(--neon-blue); 
+        color: black !important; 
+        box-shadow: 0 0 15px var(--neon-blue); 
+    }
+</style>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="home" style="color: var(--neon-blue);">HYPNO <span class="text-white">ELECTRONIC</span></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="home">CatÃ¡logo</a></li>
+        <li class="nav-item"><a class="nav-link" href="carrito.jsp">Carrito</a></li>
+        <li class="nav-item"><a class="nav-link btn btn-neon ms-lg-3" href="login.jsp">Iniciar SesiÃ³n</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+
+--------------------------------------------------
+ARCHIVO: src\main\webapp\WEB-INF\web.xml
+--------------------------------------------------
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+         http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+         version="3.0">
+
+    <display-name>HypnoElectronic - SENA</display-name>
+    <description>Proyecto para evidencia GA7-220501096-AA5-EV03</description>
+
+    <servlet>
+        <servlet-name>AuthAPIServlet</servlet-name>
+        <servlet-class>com.hypnoelectronic.api.AuthAPIServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>AuthAPIServlet</servlet-name>
+        <url-pattern>/api/auth/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>ProductosAPIServlet</servlet-name>
+        <servlet-class>com.hypnoelectronic.api.ProductosAPIServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ProductosAPIServlet</servlet-name>
+        <url-pattern>/api/products/*</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+        <servlet-name>UsuariosAPIServlet</servlet-name>
+        <servlet-class>com.hypnoelectronic.api.UsuariosAPIServlet</servlet-class>
+    </servlet>
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+
+    <session-config>
+        <session-timeout>30</session-timeout>
+    </session-config>
+
+    <jsp-config>
+        <jsp-property-group>
+            <url-pattern>*.jsp</url-pattern>
+            <page-encoding>UTF-8</page-encoding>
+        </jsp-property-group>
+    </jsp-config>
+
+</web-app>
+
+

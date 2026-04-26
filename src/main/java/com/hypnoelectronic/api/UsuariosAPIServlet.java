@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import com.hypnoelectronic.dao.UsuarioDAO;
 import com.hypnoelectronic.dto.ApiResponse;
 import com.hypnoelectronic.model.Usuario;
+import org.mindrot.jbcrypt.BCrypt; // Importar BCrypt
 import com.hypnoelectronic.util.DatabaseConnection;
 
 import javax.servlet.ServletException;
@@ -28,7 +29,7 @@ import java.util.Map;
  * Endpoint: /api/users/*
  * Autor: Miguel Castillo - Evidencia GA7-220501096-AA5-EV03
  */
-@WebServlet("/api/users/*")
+/*@WebServlet("/api/users/*")*/ // Comentado para usar web.xml
 public class UsuariosAPIServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private Gson gson = new Gson();
@@ -40,14 +41,14 @@ public class UsuariosAPIServlet extends HttpServlet {
         // Configurar respuesta
         configureResponse(response);
         
-        // Verificar autenticación y permisos
+        // 1. Verificar autenticación y permisos
         HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("usuario") == null) {
+        if (session == null || session.getAttribute("user") == null) {
             sendError(response, "No autenticado", 401);
             return;
         }
         
-        Usuario usuarioSesion = (Usuario) session.getAttribute("usuario");
+        Usuario usuarioSesion = (Usuario) session.getAttribute("user");
         if (!"admin".equals(usuarioSesion.getUserType())) {
             sendError(response, "Acceso denegado. Solo administradores", 403);
             return;
@@ -234,12 +235,6 @@ public class UsuariosAPIServlet extends HttpServlet {
             if (usuarioActualizado.getUsername() == null) {
                 usuarioActualizado.setUsername(usuarioExistente.getUsername());
             }
-            if (usuarioActualizado.getPassword() == null) {
-                usuarioActualizado.setPassword(usuarioExistente.getPassword());
-            } else {
-                // Si se envía nueva contraseña, encriptar (en una app real)
-                // Por ahora la guardamos como texto plano (igual que el registro)
-            }
             if (usuarioActualizado.getFullName() == null) {
                 usuarioActualizado.setFullName(usuarioExistente.getFullName());
             }
@@ -255,7 +250,7 @@ public class UsuariosAPIServlet extends HttpServlet {
                 !usuarioActualizado.getEmail().equals(usuarioExistente.getEmail())) {
                 
                 try (Connection conn = DatabaseConnection.getConnection()) {
-                    String checkSql = "SELECT COUNT(*) FROM usuarios WHERE (username = ? OR email = ?) AND id != ?";
+                    String checkSql = "SELECT COUNT(*) FROM usuarios WHERE (username = ? OR email = ?) AND id_usuario != ?";
                     PreparedStatement pstmt = conn.prepareStatement(checkSql);
                     pstmt.setString(1, usuarioActualizado.getUsername());
                     pstmt.setString(2, usuarioActualizado.getEmail());

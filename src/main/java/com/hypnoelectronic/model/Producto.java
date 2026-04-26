@@ -1,12 +1,17 @@
-﻿package com.hypnoelectronic.model;
+package com.hypnoelectronic.model;
 
 public class Producto {
     private int id;
     private String nombre;
     private String descripcion;
+    private String imagen_url; // La pieza que faltaba
+    private String categoria; // Se mantiene por compatibilidad (se llenará con categoriaNombre)
+    private String categoriaNombre;
+    private int categoriaId;
+    private int proveedorId;
+    private String proveedorNombre;
     private double precio;
     private int stock;
-    private String categoria;
 
     // Constructores
     public Producto() {}
@@ -14,6 +19,19 @@ public class Producto {
     public Producto(String nombre, String descripcion, double precio, int stock) {
         this.nombre = nombre;
         this.descripcion = descripcion;
+        this.precio = precio;
+        this.stock = stock;
+    }
+
+    public Producto(int id, String nombre, String descripcion, String imagen_url, int categoriaId, String categoriaNombre, int proveedorId, String proveedorNombre, double precio, int stock) {
+        this.id = id;
+        this.nombre = nombre;
+        this.descripcion = descripcion;
+        this.imagen_url = imagen_url;
+        this.categoriaId = categoriaId;
+        this.categoriaNombre = categoriaNombre;
+        this.proveedorId = proveedorId;
+        this.proveedorNombre = proveedorNombre;
         this.precio = precio;
         this.stock = stock;
     }
@@ -27,6 +45,24 @@ public class Producto {
     
     public String getDescripcion() { return descripcion; }
     public void setDescripcion(String descripcion) { this.descripcion = descripcion; }
+
+    public String getImagen_url() { return imagen_url; }
+    public void setImagen_url(String imagen_url) { this.imagen_url = imagen_url; }
+
+    public int getCategoriaId() { return categoriaId; }
+    public void setCategoriaId(int categoriaId) { this.categoriaId = categoriaId; }
+
+    public String getCategoriaNombre() { return categoriaNombre; }
+    public void setCategoriaNombre(String categoriaNombre) { this.categoriaNombre = categoriaNombre; }
+
+    public int getProveedorId() { return proveedorId; }
+    public void setProveedorId(int proveedorId) { this.proveedorId = proveedorId; }
+
+    public String getProveedorNombre() { return proveedorNombre; }
+    public void setProveedorNombre(String proveedorNombre) { this.proveedorNombre = proveedorNombre; }
+
+    // Mantener getCategoria para compatibilidad temporal si es necesario, pero usar getCategoriaNombre
+    public String getCategoria() { return categoriaNombre; }
     
     public double getPrecio() { return precio; }
     public void setPrecio(double precio) { this.precio = precio; }
@@ -36,14 +72,6 @@ public class Producto {
     
     @Override
     public String toString() {
-        return "Producto [id=" + id + ", nombre=" + nombre + ", precio=" + precio + ", stock=" + stock + "]";
-    }
-
-    public String getCategoria() {
-        return categoria;
-    }
-
-    public void setCategoria(String categoria) {
-        this.categoria = categoria;
+        return "Producto [id=" + id + ", nombre=" + nombre + ", categoria=" + categoriaNombre + ", precio=" + precio + "]";
     }
 }
