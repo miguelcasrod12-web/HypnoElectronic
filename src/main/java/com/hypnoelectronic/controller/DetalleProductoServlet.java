@@ -1,26 +1,42 @@
 package com.hypnoelectronic.controller;
 
+import com.hypnoelectronic.dao.CategoriaDAO;
 import com.hypnoelectronic.dao.ProductoDAO;
+import com.hypnoelectronic.model.Categoria;
 import com.hypnoelectronic.model.Producto;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.*;
 import java.io.IOException;
+import java.util.List;
 
-@WebServlet("/producto-detalle")
+/**
+ * Controlador que prepara la vista de detalle y las recomendaciones
+ */
 public class DetalleProductoServlet extends HttpServlet {
+    private ProductoDAO productoDAO = new ProductoDAO();
+    private CategoriaDAO categoriaDAO = new CategoriaDAO();
+
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        int id = Integer.parseInt(request.getParameter("id"));
-        
-        ProductoDAO dao = new ProductoDAO();
-        Producto producto = dao.obtenerProductoPorId(id);
-        
-        if (producto != null) {
-            request.setAttribute("p", producto);
-            request.getRequestDispatcher("detalle.jsp").forward(request, response);
-        } else {
+        try {
+            int id = Integer.parseInt(request.getParameter("id"));
+            
+            // 1. Obtener producto principal
+            Producto p = productoDAO.obtenerProductoPorId(id);
+            
+            if (p != null) {
+                // 2. Cargar listas para recomendaciones (EL PASO QUE FALTABA)
+                List<Producto> todosLosProductos = productoDAO.listarTodos();
+                List<Categoria> todasLasCategorias = categoriaDAO.listarTodas();
+
+                request.setAttribute("p", p);
+                request.setAttribute("productos", todosLosProductos);
+                request.setAttribute("categorias", todasLasCategorias);
+                
+                request.getRequestDispatcher("detalle.jsp").forward(request, response);
+            } else {
+                response.sendRedirect("home");
+            }
+        } catch (Exception e) {
             response.sendRedirect("home");
         }
     }

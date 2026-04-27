@@ -1,67 +1,86 @@
 package com.hypnoelectronic.model;
 
-import java.math.BigDecimal;
+import java.io.Serializable;
 
-public class DetallePedido {
-    private int id;
-    private int pedidoId;
-    private int productoId;
-    private Producto producto; // Para cargar la información del producto
-    private int cantidad;
-    private BigDecimal precioUnitario;
+/**
+ * Registro técnico de los componentes individuales de una orden de venta.
+ * Esta entidad vincula el inventario de HypnoElectronic con las transacciones maestras.
+ * 
+ * Autor: Miguel Castillo - HypnoElectronic
+ */
+public class DetallePedido implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    private int pkDetalle;
+    private int fkeyPedido;
+    private int fkeyProducto;
+    private String nombreDeProducto;
+    private int cantidadVendida;
+    private double precioAplicado;
 
     public DetallePedido() {}
 
-    // Getters y Setters
-    public int getId() {
-        return id;
+    /**
+     * Constructor de inicialización para procesos de venta.
+     */
+    public DetallePedido(int idProd, int cant, double pUnit) {
+        this.fkeyProducto = idProd;
+        this.cantidadVendida = cant;
+        this.precioAplicado = pUnit;
     }
 
-    public void setId(int id) {
-        this.id = id;
+    public int getIdDetalle() {
+        return this.pkDetalle;
     }
 
-    public int getPedidoId() {
-        return pedidoId;
-    }
-
-    public void setPedidoId(int pedidoId) {
-        this.pedidoId = pedidoId;
+    public void setIdDetalle(int idDetalle) {
+        this.pkDetalle = idDetalle;
     }
 
     public int getProductoId() {
-        return productoId;
+        return this.fkeyProducto;
     }
 
     public void setProductoId(int productoId) {
-        this.productoId = productoId;
+        this.fkeyProducto = productoId;
     }
 
-    public Producto getProducto() {
-        return producto;
+    public int getPedidoId() {
+        return this.fkeyPedido;
     }
 
-    public void setProducto(Producto producto) {
-        this.producto = producto;
+    public void setPedidoId(int pedidoId) {
+        this.fkeyPedido = pedidoId;
+    }
+
+    public String getNombreProducto() {
+        return this.nombreDeProducto;
+    }
+
+    public void setNombreProducto(String nombreProducto) {
+        this.nombreDeProducto = nombreProducto;
     }
 
     public int getCantidad() {
-        return cantidad;
+        return this.cantidadVendida;
     }
 
     public void setCantidad(int cantidad) {
-        this.cantidad = cantidad;
+        this.cantidadVendida = cantidad;
     }
 
-    public BigDecimal getPrecioUnitario() {
-        return precioUnitario;
+    public double getPrecioUnitario() {
+        return this.precioAplicado;
     }
 
-    public void setPrecioUnitario(BigDecimal precioUnitario) {
-        this.precioUnitario = precioUnitario;
+    public void setPrecioUnitario(double precioUnitario) {
+        this.precioAplicado = precioUnitario;
     }
 
-    public BigDecimal getSubtotal() {
-        return precioUnitario.multiply(BigDecimal.valueOf(cantidad));
+    /**
+     * Cálculo del subtotal para este renglón.
+     */
+    public double getSubtotal() {
+        return this.precioAplicado * (double) this.cantidadVendida;
     }
 }

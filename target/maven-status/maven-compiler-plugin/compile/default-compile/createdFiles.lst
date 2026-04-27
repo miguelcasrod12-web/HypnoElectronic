@@ -4,6 +4,7 @@ com\hypnoelectronic\controller\ActualizarUsuarioServlet.class
 com\hypnoelectronic\api\AuthAPIServlet.class
 com\hypnoelectronic\controller\DetalleProductoServlet.class
 com\hypnoelectronic\dao\CategoriaDAO.class
+com\hypnoelectronic\controller\PedidoAdminServlet.class
 com\hypnoelectronic\controller\AppointmentServlet.class
 com\hypnoelectronic\controller\ProductoAdminServlet.class
 com\hypnoelectronic\controller\LoginServlet.class
@@ -40,6 +41,7 @@ com\hypnoelectronic\filtro\CORSFilter.class
 com\hypnoelectronic\model\Producto.class
 com\hypnoelectronic\util\DatabaseConnection.class
 com\hypnoelectronic\api\CORSFilter.class
+com\hypnoelectronic\controller\ConfirmarPagoServlet.class
 com\hypnoelectronic\dto\ApiResponse.class
 com\hypnoelectronic\controller\ReporteVentasServlet.class
 com\hypnoelectronic\model\Pedido.class

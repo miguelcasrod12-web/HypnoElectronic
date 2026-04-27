@@ -94,11 +94,10 @@ public class ProductoDAO {
     }
 
     public Producto obtenerProductoPorId(int id) {
-        // Se une con categorías y proveedores para obtener los nombres también
         String sql = "SELECT p.*, c.nombre as cat_nom, prov.nombre as prov_nom " +
                      "FROM productos p LEFT JOIN categorias c ON p.categoria_id = c.id_categoria " +
-                     "LEFT JOIN proveedores prov ON p.proveedor_id = prov.id_proveedor " + // Corregido: id a id_producto
-                     "WHERE p.id_producto = ?"; // Corregido: id a id_producto
+                     "LEFT JOIN proveedores prov ON p.proveedor_id = prov.id_proveedor " +
+                     "WHERE p.id_producto = ?";
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
@@ -159,7 +158,8 @@ public class ProductoDAO {
         p.setStock(rs.getInt("stock_actual"));
         p.setCategoriaId(rs.getInt("categoria_id"));
         p.setProveedorId(rs.getInt("proveedor_id"));
-        
+
+        // Traer nombres para reportes y catálogo
         try { p.setCategoriaNombre(rs.getString("cat_nom")); } catch (Exception e) {}
         try { p.setProveedorNombre(rs.getString("prov_nom")); } catch (Exception e) {}
         

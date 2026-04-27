@@ -51,7 +51,7 @@ public class CrudTestServlet extends HttpServlet {
         out.println("<h2>1. Operaciones CRUD con Usuarios</h2>");
         
         // INSERTAR usuario
-        Usuario nuevoUsuario = new Usuario("testuser", "test123", "Usuario de Prueba", "test@email.com", "patient");
+        Usuario nuevoUsuario = new Usuario("testuser", "test123", "Usuario de Prueba", "test@email.com", "cliente", "Calle Ficticia 123", "3001234567", "Cajicá");
         boolean insertado = usuarioDAO.insertarUsuario(nuevoUsuario);
         out.println("<p class='" + (insertado ? "success" : "error") + "'>");
         out.println("✓ INSERTAR usuario: " + (insertado ? "ÉXITO" : "FALLO"));

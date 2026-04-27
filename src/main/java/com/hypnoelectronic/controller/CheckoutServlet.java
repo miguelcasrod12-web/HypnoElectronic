@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +23,17 @@ public class CheckoutServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        // Simplemente redirige a la página de confirmación de checkout
-        // Aquí se podría mostrar un resumen final antes de confirmar
+        HttpSession session = request.getSession();
+        Map<Integer, ItemCarrito> carrito = (Map<Integer, ItemCarrito>) session.getAttribute("carrito");
+        
+        double total = 0;
+        if (carrito != null) {
+            for (ItemCarrito item : carrito.values()) {
+                total += item.getSubtotal();
+            }
+        }
+        
+        request.setAttribute("totalFinal", total);
         request.getRequestDispatcher("checkout.jsp").forward(request, response);
     }
 
@@ -46,40 +54,27 @@ public class CheckoutServlet extends HttpServlet {
         }
 
         try {
-            // Calcular total del pedido
-            BigDecimal totalPedido = BigDecimal.ZERO;
-            List<DetallePedido> detallesPedido = new ArrayList<>();
-
-            for (ItemCarrito item : carrito.values()) {
-                DetallePedido detalle = new DetallePedido();
-                detalle.setProductoId(item.getProducto().getId());
-                detalle.setCantidad(item.getCantidad());
-                detalle.setPrecioUnitario(BigDecimal.valueOf(item.getProducto().getPrecio()));
-                detallesPedido.add(detalle);
-                totalPedido = totalPedido.add(detalle.getSubtotal());
+            // 1. Capturar datos de envío del formulario
+            String direccion = request.getParameter("direccion");
+            String telefono = request.getParameter("telefono");
+            String ciudad = request.getParameter("ciudad");
+            
+            // 2. Guardar temporalmente en sesión para cuando el pago sea exitoso
+            session.setAttribute("temp_direccion", direccion);
+            session.setAttribute("temp_telefono", telefono);
+            session.setAttribute("temp_ciudad", ciudad);
+            
+            // 3. (Opcional) Actualizar perfil del usuario si no tenía estos datos
+            if (usuario.getDireccion() == null || usuario.getDireccion().isEmpty()) {
+                usuario.setDireccion(direccion);
+                usuario.setTelefono(telefono);
+                usuario.setCiudad(ciudad);
+                new com.hypnoelectronic.dao.UsuarioDAO().actualizarUsuario(usuario);
             }
 
-            // Crear objeto Pedido
-            Pedido pedido = new Pedido();
-            pedido.setUsuarioId(usuario.getId());
-            pedido.setTotal(totalPedido);
-            pedido.setEstado("pagado"); // O 'pendiente' si hay un proceso de pago real
+            // 4. Redirigir a la simulación de pasarela de pago
+            response.sendRedirect("pasarela.jsp");
 
-            // Guardar pedido y detalles en la base de datos, y actualizar stock
-            PedidoDAO pedidoDAO = new PedidoDAO();
-            boolean exito = pedidoDAO.crearPedido(pedido, detallesPedido);
-
-            if (exito) {
-                session.removeAttribute("carrito"); // Limpiar carrito después de la compra
-                session.removeAttribute("listaCarrito");
-                response.sendRedirect("confirmacion-compra.jsp?pedidoId=" + pedido.getId());
-            } else {
-                response.sendRedirect("carrito.jsp?error=checkout_failed");
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            response.sendRedirect("carrito.jsp?error=db_error&msg=" + e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
             response.sendRedirect("carrito.jsp?error=internal_error&msg=" + e.getMessage());

@@ -8,6 +8,7 @@ C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\CambiarRo
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\CarritoServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\CategoriaAdminServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\CheckoutServlet.java
+C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\ConfirmarPagoServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\CrudTestServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\DetalleProductoServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\EditarProductoServlet.java
@@ -19,6 +20,7 @@ C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\GuardarUs
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\HomeServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\LoginServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\MisComprasServlet.java
+C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\PedidoAdminServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\ProductoAdminServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\ProveedorAdminServlet.java
 C:\GitHub\HypnoElectronic\src\main\java\com\hypnoelectronic\controller\RegisterServlet.java

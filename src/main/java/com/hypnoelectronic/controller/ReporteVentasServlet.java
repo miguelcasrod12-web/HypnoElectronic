@@ -1,10 +1,12 @@
 package com.hypnoelectronic.controller;
 
 import com.hypnoelectronic.dao.CategoriaDAO;
+import com.hypnoelectronic.dao.PedidoDAO;
 import com.hypnoelectronic.dao.ProductoDAO;
 import com.hypnoelectronic.dao.UsuarioDAO;
-import com.hypnoelectronic.model.Producto;
+import com.hypnoelectronic.model.Pedido;
 import com.hypnoelectronic.model.Usuario;
+import com.hypnoelectronic.model.Producto;
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
 import java.io.IOException;
@@ -25,31 +27,59 @@ public class ReporteVentasServlet extends HttpServlet {
             return;
         }
 
-        // Instanciar DAOs para obtener datos vivos
         ProductoDAO pDao = new ProductoDAO();
         UsuarioDAO uDao = new UsuarioDAO();
-        CategoriaDAO cDao = new CategoriaDAO();
+        PedidoDAO pedDao = new PedidoDAO();
 
+        // 1. Obtener la lista maestra una sola vez para garantizar consistencia
         List<Producto> productos = pDao.listarTodos();
-        int stockCritico = 0;
-        double valorTotal = 0;
         
-        // Agrupar stock por categoría para la gráfica de pastel
-        Map<String, Integer> stockPorCat = new HashMap<>();
+        // 2. Calcular métricas basadas EXACTAMENTE en la misma lista
+        long stockCritico = productos.stream()
+                            .filter(p -> p.getStock() < 5)
+                            .count();
 
-        for (Producto p : productos) {
-            if (p.getStock() < 5) stockCritico++;
-            valorTotal += (p.getPrecio() * p.getStock());
-            
-            String catNom = (p.getCategoriaNombre() != null) ? p.getCategoriaNombre() : "Sin Categoría";
-            stockPorCat.put(catNom, stockPorCat.getOrDefault(catNom, 0) + p.getStock());
+        double valorTotal = productos.stream()
+                            .mapToDouble(p -> p.getPrecio() * p.getStock())
+                            .sum();
+
+        // 3. Procesar datos de Ventas
+        List<Pedido> pedidos = pedDao.listarTodos();
+        double ventasTotales = pedidos.stream().mapToDouble(Pedido::getTotal).sum();
+        
+        Map<String, Integer> stockPorCat = new HashMap<>();
+        Map<String, Integer> stockPorProv = new HashMap<>();
+        Map<String, Integer> pedidosPorEstado = new HashMap<>();
+
+        for (Pedido ped : pedidos) {
+            String est = (ped.getEstado() != null) ? ped.getEstado() : "pendiente";
+            pedidosPorEstado.put(est, pedidosPorEstado.getOrDefault(est, 0) + 1);
         }
 
+        for (Producto p : productos) {
+            // Agrupar por Categoría
+            String catNom = (p.getCategoriaNombre() != null) ? p.getCategoriaNombre() : "Otros";
+            stockPorCat.put(catNom, stockPorCat.getOrDefault(catNom, 0) + p.getStock());
+            
+            // Agrupar por Proveedor
+            String provNom = (p.getProveedorNombre() != null) ? p.getProveedorNombre() : "Sin Asignar";
+            stockPorProv.put(provNom, stockPorProv.getOrDefault(provNom, 0) + p.getStock());
+        }
+
+        // Contar solo CLIENTES activos (excluyendo administradores) para evitar desfases
+        long clientesReales = uDao.obtenerTodosUsuarios().stream()
+                                .filter(u -> "cliente".equalsIgnoreCase(u.getUserType()))
+                                .count();
+
         request.setAttribute("productos", productos);
-        request.setAttribute("totalUsers", uDao.obtenerTodosUsuarios().size());
-        request.setAttribute("stockCriticoCount", stockCritico);
+        request.setAttribute("pedidos", pedidos);
+        request.setAttribute("totalUsers", (int) clientesReales);
+        request.setAttribute("stockCriticoCount", (int) stockCritico);
         request.setAttribute("valorInv", valorTotal);
+        request.setAttribute("ventasTotales", ventasTotales);
         request.setAttribute("catData", stockPorCat);
+        request.setAttribute("provData", stockPorProv);
+        request.setAttribute("statusData", pedidosPorEstado);
 
         request.getRequestDispatcher("reportes.jsp").forward(request, response);
     }

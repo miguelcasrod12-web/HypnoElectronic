@@ -128,9 +128,9 @@ public class UsuarioDAO {
         String hashedPassword = null;
         if (usuario.getPassword() != null && !usuario.getPassword().isEmpty()) {
             hashedPassword = BCrypt.hashpw(usuario.getPassword(), BCrypt.gensalt()); // Hash de la nueva contraseña
-            sql = "UPDATE usuarios SET nombre_completo = ?, email = ?, username = ?, password = ?, role_id = ? WHERE id_usuario = ?";
+            sql = "UPDATE usuarios SET nombre_completo = ?, email = ?, username = ?, direccion = ?, telefono = ?, ciudad = ?, password = ?, role_id = ? WHERE id_usuario = ?";
         } else {
-            sql = "UPDATE usuarios SET nombre_completo = ?, email = ?, username = ?, role_id = ? WHERE id_usuario = ?";
+            sql = "UPDATE usuarios SET nombre_completo = ?, email = ?, username = ?, direccion = ?, telefono = ?, ciudad = ?, role_id = ? WHERE id_usuario = ?";
         }
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -139,6 +139,9 @@ public class UsuarioDAO {
             pstmt.setString(i++, usuario.getFullName());
             pstmt.setString(i++, usuario.getEmail());
             pstmt.setString(i++, usuario.getUsername());
+            pstmt.setString(i++, usuario.getDireccion());
+            pstmt.setString(i++, usuario.getTelefono());
+            pstmt.setString(i++, usuario.getCiudad());
             if (hashedPassword != null) {
                 pstmt.setString(i++, hashedPassword);
             }
@@ -173,6 +176,9 @@ public class UsuarioDAO {
         usuario.setPassword(rs.getString("password"));
         usuario.setFullName(rs.getString("nombre_completo"));
         usuario.setEmail(rs.getString("email"));
+        usuario.setDireccion(rs.getString("direccion"));
+        usuario.setTelefono(rs.getString("telefono"));
+        usuario.setCiudad(rs.getString("ciudad"));
         // Verificación segura de la existencia de la columna de rol
         String role = rs.getString("nombre_role");
         usuario.setUserType(role != null ? role : "cliente");

@@ -49,7 +49,7 @@ public class UsuariosAPIServlet extends HttpServlet {
         }
         
         Usuario usuarioSesion = (Usuario) session.getAttribute("user");
-        if (!"admin".equals(usuarioSesion.getUserType())) {
+        if (!"admin".equalsIgnoreCase(usuarioSesion.getUserType())) {
             sendError(response, "Acceso denegado. Solo administradores", 403);
             return;
         }

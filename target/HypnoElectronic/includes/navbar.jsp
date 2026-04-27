@@ -17,6 +17,9 @@
         background-color: var(--dark-bg); 
         color: white; 
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
     }
 
     label.form-label, .text-secondary {
@@ -67,10 +70,9 @@
         margin-top: 10px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.5);
     }
-
 </style>
 
-<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark mb-4 sticky-top">
   <div class="container">
     <a class="navbar-brand fw-bold" href="home" style="color: var(--neon-blue);">HYPNO <span class="text-white">ELECTRONIC</span></a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -111,6 +113,7 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary">
                     <li><a class="dropdown-item text-white" href="configuracion.jsp">Mi Perfil</a></li>
+                    <li><a class="dropdown-item text-white" href="mis-compras">Mis Compras</a></li>
                     <% if ("admin".equalsIgnoreCase(usuarioSesion.getUserType())) { %>
                         <li><hr class="dropdown-divider border-secondary"></li>
                         <li><a class="dropdown-item text-warning" href="dashboard.jsp">Panel Admin</a></li>

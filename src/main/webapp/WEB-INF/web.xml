@@ -235,31 +235,7 @@
         <url-pattern>/reporte-ventas</url-pattern>
     </servlet-mapping>
 
-    <welcome-file-list>
-        <welcome-file>index.jsp</welcome-file>
-    </welcome-file-list>
-
-    <session-config>
-        <session-timeout>30</session-timeout>
-    </session-config>
-
-    <jsp-config>
-        <jsp-property-group>
-            <url-pattern>*.jsp</url-pattern>
-            <page-encoding>UTF-8</page-encoding>
-        </jsp-property-group>
-    </jsp-config>
-
-    <error-page>
-        <error-code>404</error-code>
-        <location>/404.jsp</location>
-    </error-page>
-
-    <error-page>
-        <error-code>500</error-code>
-        <location>/500.jsp</location>
-    </error-page>
-    <servlet>
+        <servlet>
         <servlet-name>ReporteDetalleServlet</servlet-name>
         <servlet-class>com.hypnoelectronic.controller.ReporteDetalleServlet</servlet-class>
     </servlet>
@@ -269,13 +245,20 @@
     </servlet-mapping>
 
     <servlet>
-        <servlet-name>ReporteExportServlet</servlet-name>
-        <servlet-class>com.hypnoelectronic.controller.ReporteExportServlet</servlet-class>
+        <servlet-name>PedidoAdminServlet</servlet-name>
+        <servlet-class>com.hypnoelectronic.controller.PedidoAdminServlet</servlet-class>
     </servlet>
     <servlet-mapping>
-        <servlet-name>ReporteExportServlet</servlet-name>
-        <url-pattern>/exportar-reporte</url-pattern>
+        <servlet-name>PedidoAdminServlet</servlet-name>
+        <url-pattern>/admin-pedidos</url-pattern>
     </servlet-mapping>
 
-
+    <servlet>
+        <servlet-name>ConfirmarPagoServlet</servlet-name>
+        <servlet-class>com.hypnoelectronic.controller.ConfirmarPagoServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ConfirmarPagoServlet</servlet-name>
+        <url-pattern>/confirmar-pago</url-pattern>
+    </servlet-mapping>
 </web-app>

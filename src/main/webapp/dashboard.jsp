@@ -68,6 +68,17 @@
                 <div class="card h-100 p-3 text-center" style="background-color: var(--card-bg); border: 1px solid #333;">
                     <div class="card-body">
                         <div class="mb-3" style="font-size: 2rem; color: var(--neon-blue);">📦</div>
+                        <h5 class="card-title text-white">Órdenes</h5>
+                        <p class="card-text text-secondary small">Seguimiento y despachos.</p>
+                        <a href="admin-pedidos" class="btn btn-outline-info btn-sm w-100">Ver Pedidos</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card h-100 p-3 text-center" style="background-color: var(--card-bg); border: 1px solid #333;">
+                    <div class="card-body">
+                        <div class="mb-3" style="font-size: 2rem; color: var(--neon-blue);">📦</div>
                         <h5 class="card-title text-white">Inventario</h5>
                         <p class="card-text text-secondary small">Control de stock de periféricos.</p>
                         <a href="admin-inventario" class="btn btn-outline-info btn-sm w-100">Ver Panel</a>
@@ -127,6 +138,7 @@
         </div>
     </div>
 
+    <%@ include file="includes/footer.jsp" %>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

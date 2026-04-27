@@ -66,7 +66,8 @@ CREATE TABLE pedidos (
     usuario_id INT,
     fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     total DECIMAL(12,2) NOT NULL,
-    estado ENUM('pendiente', 'pagado', 'enviado', 'cancelado') DEFAULT 'pendiente',
+    estado ENUM('pendiente', 'pagado', 'alistado', 'recogido', 'entregado', 'cancelado') DEFAULT 'pendiente',
+    numero_guia VARCHAR(50),
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id_usuario)
 );
 

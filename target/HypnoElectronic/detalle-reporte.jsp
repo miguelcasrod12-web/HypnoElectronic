@@ -22,6 +22,9 @@
                         <c:when test="${tipo == 'clientes'}">
                             <tr><th>Nombre</th><th>Username</th><th>Email</th><th>Fecha Registro</th></tr>
                         </c:when>
+                        <c:when test="${tipo == 'pedidos'}">
+                            <tr><th>ID</th><th>Cliente</th><th>Fecha</th><th>Estado</th><th class="text-end">Total</th></tr>
+                        </c:when>
                         <c:otherwise>
                             <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Existencia</th><th>Valor en Stock</th></tr>
                         </c:otherwise>
@@ -36,6 +39,13 @@
                                     <td class="text-info">@${item.username}</td>
                                     <td>${item.email}</td>
                                     <td class="text-secondary small">${item.createdAt}</td>
+                                </c:when>
+                                <c:when test="${tipo == 'pedidos'}">
+                                    <td class="text-info">#${item.id}</td>
+                                    <td>${item.usuarioNombre}</td>
+                                    <td class="small">${item.fecha}</td>
+                                    <td><span class="badge ${item.estado == 'entregado' ? 'bg-success' : 'bg-warning text-dark'}">${(item.estado != null ? item.estado : 'pendiente').toUpperCase()}</span></td>
+                                    <td class="text-end text-success fw-bold">$${item.total}</td>
                                 </c:when>
                                 <c:otherwise>
                                     <td>${item.nombre}</td>

@@ -16,6 +16,9 @@ public class Usuario implements Serializable {
     private String fullName;
     private String email;
     private String userType; // Aquí guardaremos "admin" o "cliente"
+    private String direccion;
+    private String telefono;
+    private String ciudad;
     private Timestamp createdAt;
 
     // Constructor vacío (Obligatorio para Java Beans y Frameworks)
@@ -23,12 +26,15 @@ public class Usuario implements Serializable {
     }
 
     // Constructor completo para registros rápidos
-    public Usuario(String username, String password, String fullName, String email, String userType) {
+    public Usuario(String username, String password, String fullName, String email, String userType, String direccion, String telefono, String ciudad) {
         this.username = username;
         this.password = password;
         this.fullName = fullName;
         this.email = email;
         this.userType = userType;
+        this.direccion = direccion;
+        this.telefono = telefono;
+        this.ciudad = ciudad;
     }
 
     // Getters y Setters
@@ -83,12 +89,36 @@ public class Usuario implements Serializable {
         this.userType = userType;
     }
 
+    public String getCiudad() {
+        return ciudad;
+    }
+
+    public void setCiudad(String ciudad) {
+        this.ciudad = ciudad;
+    }
+
     public Timestamp getCreatedAt() {
         return createdAt;
     }
 
     public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getDireccion() {
+        return direccion;
+    }
+
+    public void setDireccion(String direccion) {
+        this.direccion = direccion;
+    }
+
+    public String getTelefono() {
+        return telefono;
+    }
+
+    public void setTelefono(String telefono) {
+        this.telefono = telefono;
     }
 
     // Método útil para depuración en consola
